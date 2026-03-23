@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { TaskProvider } from "./contexts/TaskContext";
@@ -171,7 +171,7 @@ export default function App() {
 
     return (
       <>
-        <BrowserRouter>
+        <HashRouter>
           <AppRoutes />
           <Toaster
             position="top-right"
@@ -185,7 +185,7 @@ export default function App() {
               },
             }}
           />
-        </BrowserRouter>
+        </HashRouter>
 
         {actionLoading ? (
           <FullscreenLoader

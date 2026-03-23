@@ -1,8 +1,20 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api, { safeRequest } from "../api/client";
+import { normalizeRole } from "../lib/constants";
 
 const AuthContext = createContext(null);
+
+function normalizeUser(user) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    ...user,
+    role: normalizeRole(user.role),
+  };
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -32,7 +44,7 @@ export function AuthProvider({ children }) {
 
       try {
         const data = await safeRequest(() => api.get("/auth/me"), "Unable to restore session");
-        setUser(data.user);
+        setUser(normalizeUser(data.user));
       } catch {
         localStorage.removeItem("dtms_token");
         setUser(null);
@@ -48,7 +60,7 @@ export function AuthProvider({ children }) {
     return runWithLoader("Initializing DTMS...", async () => {
       const data = await safeRequest(() => api.post("/login", payload), "Login failed");
       localStorage.setItem("dtms_token", data.token);
-      setUser(data.user);
+      setUser(normalizeUser(data.user));
       toast.success("Signed in successfully");
       return data;
     });

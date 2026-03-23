@@ -1,19 +1,18 @@
-import Task from "../models/Task.js";
-import User from "../models/User.js";
+import prisma from "../lib/prisma.js";
 
 export async function getDashboard(req, res) {
-  const filter = req.user.role === "admin" ? {} : { assignedTo: req.user._id };
+  const where = req.user.role === "ADMIN" ? {} : { userId: req.user.id };
 
   const [totalTasks, completedTasks, pendingTasks, inProgressTasks] = await Promise.all([
-    Task.countDocuments(filter),
-    Task.countDocuments({ ...filter, status: "Completed" }),
-    Task.countDocuments({ ...filter, status: "Pending" }),
-    Task.countDocuments({ ...filter, status: "In Progress" }),
+    prisma.task.count({ where }),
+    prisma.task.count({ where: { ...where, status: "COMPLETED" } }),
+    prisma.task.count({ where: { ...where, status: "PENDING" } }),
+    prisma.task.count({ where: { ...where, status: "IN_PROGRESS" } }),
   ]);
 
   res.status(200).json({
     user: {
-      id: req.user._id,
+      id: req.user.id,
       name: req.user.name,
       email: req.user.email,
       role: req.user.role,
@@ -28,17 +27,19 @@ export async function getDashboard(req, res) {
 }
 
 export async function listUsers(req, res) {
-  const users = await User.find({ role: "user" })
-    .select("_id name email role isVerified createdAt")
-    .sort({ createdAt: -1 });
+  const users = await prisma.user.findMany({
+    where: { role: "USER" },
+    select: { id: true, name: true, email: true, role: true, emailVerified: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   res.status(200).json({
     users: users.map((user) => ({
-      id: String(user._id),
+      id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
-      isVerified: Boolean(user.isVerified),
+      isVerified: user.emailVerified,
       createdAt: user.createdAt,
     })),
   });

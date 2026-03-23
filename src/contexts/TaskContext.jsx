@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import api, { safeRequest } from "../api/client";
-import { taskVisuals } from "../lib/constants";
+import { normalizeTaskStatus, taskVisuals } from "../lib/constants";
 import { formatDate } from "../lib/utils";
 import { useAuth } from "./AuthContext";
 
@@ -13,13 +13,15 @@ function decorateTasks(tasks) {
     const deadline = task.deadline ?? null;
     const dueDate = deadline ? formatDate(deadline) : "--";
     const image = task.image || taskVisuals[index % taskVisuals.length];
+    const status = normalizeTaskStatus(task.status);
     const isOverdue =
       Boolean(deadline) &&
-      task.status !== "Completed" &&
+      status !== "COMPLETED" &&
       new Date(deadline).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
 
     return {
       ...task,
+      status,
       assignedUser: assignedName,
       assignedUserName: assignedName,
       deadline,

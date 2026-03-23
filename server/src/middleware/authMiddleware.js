@@ -1,5 +1,9 @@
 import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+import prisma from "../lib/prisma.js";
+
+function normalizeRole(role) {
+  return typeof role === "string" ? role.toUpperCase() : role;
+}
 
 export async function requireAuth(req, res, next) {
   try {
@@ -14,31 +18,33 @@ export async function requireAuth(req, res, next) {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (String(decoded.id).startsWith("admin:")) {
-      req.user = {
-        _id: "dtms-admin",
-        name: "DTMS Admin",
-        email: process.env.ADMIN_EMAIL || "admin@dtms.com",
-        role: "admin",
-      };
-      return next();
-    }
-
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        emailVerified: true,
+      },
+    });
 
     if (!user) {
       return res.status(401).json({ message: "User no longer exists" });
     }
 
-    req.user = user;
+    req.user = {
+      ...user,
+      role: normalizeRole(user.role),
+    };
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({ message: "Invalid or expired token" });
   }
 }
 
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== "admin") {
+  if (req.user?.role !== "ADMIN") {
     return res.status(403).json({ message: "Admin access required" });
   }
 

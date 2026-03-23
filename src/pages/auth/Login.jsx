@@ -5,6 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "../../contexts/AuthContext";
+import { isAdminRole } from "../../lib/constants";
+import { resendVerificationEmail } from "../../api/authApi";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -66,6 +68,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [serverMessage, setServerMessage] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
   const [activeLine, setActiveLine] = useState(0);
   const {
     register,
@@ -96,13 +99,34 @@ export default function Login() {
     setServerMessage("");
     try {
       const response = await login(values);
-      navigate(response.user.role === "admin" ? "/admin-dashboard" : "/user-dashboard", { replace: true });
+      navigate(isAdminRole(response.user.role) ? "/admin-dashboard" : "/user-dashboard", { replace: true });
     } catch (error) {
       setServerMessage(error.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }
   }
+
+  async function handleResendVerification() {
+    const email = watch("email");
+
+    if (!email) {
+      setServerMessage("Enter your email first, then resend the verification link.");
+      return;
+    }
+
+    setResendLoading(true);
+    try {
+      const response = await resendVerificationEmail(email);
+      setServerMessage(response.message || "A verification email has been sent.");
+    } catch (error) {
+      setServerMessage(error.message || "Unable to resend verification email");
+    } finally {
+      setResendLoading(false);
+    }
+  }
+
+  const needsVerification = serverMessage.toLowerCase().includes("verify your email");
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#eef4ff]">
@@ -218,9 +242,21 @@ export default function Login() {
               />
 
               {serverMessage ? (
-                <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-                  {serverMessage}
-                </p>
+                <div className="space-y-3">
+                  <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                    {serverMessage}
+                  </p>
+                  {needsVerification ? (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={resendLoading}
+                      className="w-full rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {resendLoading ? "Sending verification email..." : "Resend verification email"}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
 
               <button

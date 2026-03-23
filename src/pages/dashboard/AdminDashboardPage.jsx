@@ -15,6 +15,7 @@ import {
 import MetricCard from "../../components/dashboard/MetricCard";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTasks } from "../../contexts/TaskContext";
+import { displayTaskStatus, normalizeTaskStatus } from "../../lib/constants";
 
 const PIE_COLORS = ["#2563eb", "#60a5fa", "#93c5fd", "#bfdbfe"];
 
@@ -34,7 +35,7 @@ function formatTimeline(tasks) {
 function getDueSoonTasks(tasks) {
   const now = new Date();
   return tasks
-    .filter((task) => task.deadline && task.status !== "Completed")
+    .filter((task) => task.deadline && normalizeTaskStatus(task.status) !== "COMPLETED")
     .map((task) => {
       const diff = Math.ceil((new Date(task.deadline).setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / (24 * 60 * 60 * 1000));
       return { ...task, remainingDays: diff };
@@ -50,16 +51,19 @@ export default function AdminDashboardPage() {
 
   const stats = useMemo(() => {
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((task) => task.status === "Completed").length;
-    const ongoingTasks = tasks.filter((task) => task.status === "In Progress").length;
-    const pendingTasks = tasks.filter((task) => ["Pending", "Pending Review", "Rejected"].includes(task.status)).length;
+    const completedTasks = tasks.filter((task) => normalizeTaskStatus(task.status) === "COMPLETED").length;
+    const ongoingTasks = tasks.filter((task) => normalizeTaskStatus(task.status) === "IN_PROGRESS").length;
+    const pendingTasks = tasks.filter((task) =>
+      ["PENDING", "PENDING_REVIEW", "REJECTED"].includes(normalizeTaskStatus(task.status)),
+    ).length;
     return { totalTasks, completedTasks, ongoingTasks, pendingTasks };
   }, [tasks]);
 
   const barData = useMemo(() => formatTimeline(tasks), [tasks]);
   const donutData = useMemo(() => {
     const grouped = tasks.reduce((acc, task) => {
-      acc[task.status] = (acc[task.status] ?? 0) + 1;
+      const label = displayTaskStatus(task.status);
+      acc[label] = (acc[label] ?? 0) + 1;
       return acc;
     }, {});
 

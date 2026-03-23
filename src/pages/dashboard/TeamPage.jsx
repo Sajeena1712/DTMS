@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchUsers } from "../../api/userApi";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTasks } from "../../contexts/TaskContext";
+import { isAdminRole } from "../../lib/constants";
 
 export default function TeamPage() {
   const { user } = useAuth();
@@ -22,7 +23,7 @@ export default function TeamPage() {
   }, []);
 
   const collaborators = useMemo(() => {
-    if (user?.role === "admin") {
+    if (isAdminRole(user?.role)) {
       return users;
     }
 
@@ -40,10 +41,10 @@ export default function TeamPage() {
       <section className="task-panel p-6">
         <p className="text-xs uppercase tracking-[0.28em] text-blue-500">Team</p>
         <h1 className="mt-3 font-display text-4xl font-semibold text-slate-950">
-          {user?.role === "admin" ? "Team management" : "Team collaboration"}
+          {isAdminRole(user?.role) ? "Team management" : "Team collaboration"}
         </h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600">
-          {user?.role === "admin"
+          {isAdminRole(user?.role)
             ? "Review team members, assignment coverage, and collaboration visibility."
             : "See the people connected to your active tasks and delivery workflow."}
         </p>

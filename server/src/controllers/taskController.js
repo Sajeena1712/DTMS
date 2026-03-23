@@ -1,50 +1,210 @@
-import mongoose from "mongoose";
-import Task from "../models/Task.js";
-import User from "../models/User.js";
+import prisma from "../lib/prisma.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { buildCalendarPanel, buildPremiumEmail, formatDateLabel } from "../utils/emailTemplates.js";
+import fs from "fs/promises";
+import path from "path";
+import { randomUUID } from "crypto";
+import { fileURLToPath } from "url";
 
-function serializeTask(taskDoc) {
-  const task = taskDoc?.toObject ? taskDoc.toObject({ virtuals: false }) : taskDoc;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDirectory = path.resolve(__dirname, "../../uploads");
+
+function sanitizeFileName(fileName) {
+  return String(fileName || "submission")
+    .replace(/[^\w.\- ]+/g, "")
+    .trim();
+}
+
+function resolveStoredUploadPath(fileUrl) {
+  if (typeof fileUrl !== "string" || !fileUrl.startsWith("/uploads/")) {
+    return null;
+  }
+
+  const fileName = path.basename(fileUrl);
+  return path.join(uploadsDirectory, fileName);
+}
+
+async function removeStoredUpload(fileUrl) {
+  const uploadPath = resolveStoredUploadPath(fileUrl);
+  if (!uploadPath) {
+    return;
+  }
+
+  await fs.unlink(uploadPath).catch(() => undefined);
+}
+
+async function saveUploadedSubmission({ fileName, fileData }) {
+  const matches = String(fileData || "").match(/^data:(.+?);base64,(.+)$/);
+  if (!matches) {
+    throw new Error("Invalid uploaded file data");
+  }
+
+  const [, mimeType, base64Payload] = matches;
+  const fileBuffer = Buffer.from(base64Payload, "base64");
+  const safeName = sanitizeFileName(fileName);
+  const extension = path.extname(safeName) || (mimeType === "application/pdf" ? ".pdf" : "");
+  const storedFileName = `${Date.now()}-${randomUUID()}${extension}`;
+
+  await fs.mkdir(uploadsDirectory, { recursive: true });
+  await fs.writeFile(path.join(uploadsDirectory, storedFileName), fileBuffer);
+
+  return `/uploads/${storedFileName}`;
+}
+
+function formatTaskStatus(status) {
+  return String(status || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function buildSubmissionNotificationEmail({ taskTitle, status, submissionText, submissionFileName }) {
   return {
-    id: String(task._id),
+    subject: `DTMS submission received: ${taskTitle}`,
+    text: [
+      `A submission was received for "${taskTitle}".`,
+      `Status: ${formatTaskStatus(status) || "Updated"}.`,
+      submissionText ? `Note: ${submissionText}` : null,
+      submissionFileName ? `Attachment: ${submissionFileName}` : null,
+      "Open DTMS to review it.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: buildPremiumEmail({
+      eyebrow: "DTMS Submission",
+      title: "New task submission",
+      intro: `A submission has been received for <strong>${taskTitle}</strong>. The task is now marked as <strong>${formatTaskStatus(status) || "Updated"}</strong>.`,
+      actionLabel: "Review in DTMS",
+      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
+      footerNote: "Review the submission in DTMS and continue the workflow.",
+      accent: "#2563eb",
+      accentSoft: "#dbeafe",
+      badgeTone: "#2563eb",
+      details: [
+        { label: "Task", value: taskTitle },
+        { label: "Status", value: formatTaskStatus(status) || "Updated" },
+        ...(submissionText ? [{ label: "Submission Note", value: submissionText }] : []),
+        ...(submissionFileName ? [{ label: "Attachment", value: submissionFileName }] : []),
+      ],
+    }),
+  };
+}
+
+function buildAssignedTaskEmail({ taskTitle, description, status, deadline, assigneeName }) {
+  const deadlineLabel = formatDateLabel(deadline);
+
+  return {
+    subject: `DTMS task assigned: ${taskTitle}`,
+    text: [
+      `You have been assigned "${taskTitle}".`,
+      description ? `Details: ${description}` : null,
+      status ? `Current status: ${formatTaskStatus(status)}` : null,
+      deadlineLabel ? `Deadline: ${deadlineLabel}` : null,
+      "Open DTMS to review the task.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: buildPremiumEmail({
+      eyebrow: "DTMS Task Assignment",
+      title: assigneeName ? `${assigneeName}, new task assigned` : "New task assigned",
+      intro: `A task titled <strong>${taskTitle}</strong> has been assigned to you.`,
+      actionLabel: "Open Task",
+      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
+      footerNote: "Review the task details and update your progress in DTMS.",
+      accent: "#2563eb",
+      accentSoft: "#dbeafe",
+      badgeTone: "#2563eb",
+      details: [
+        { label: "Task", value: taskTitle },
+        ...(description ? [{ label: "Summary", value: description }] : []),
+        ...(status ? [{ label: "Status", value: formatTaskStatus(status) }] : []),
+        ...(deadlineLabel ? [{ label: "Deadline", value: deadlineLabel }] : []),
+      ],
+      extraHtml: deadline
+        ? buildCalendarPanel({
+            label: "Task deadline",
+            title: deadlineLabel || "No deadline",
+            date: "Plan your work before this date",
+            caption: "Use DTMS to stay on schedule.",
+          })
+        : "",
+    }),
+  };
+}
+
+function buildTaskDecisionEmail({ taskTitle, decision, feedback, deadline }) {
+  const decisionLabel = decision === "Approved" ? "Approved" : "Rejected";
+  const isApproved = decisionLabel === "Approved";
+  const accent = isApproved ? "#059669" : "#e11d48";
+  const accentSoft = isApproved ? "#d1fae5" : "#ffe4e6";
+  const title = isApproved ? "Task approved" : "Task rejected";
+
+  return {
+    subject: `DTMS task ${decisionLabel.toLowerCase()}: ${taskTitle}`,
+    text: [
+      `Your task "${taskTitle}" has been ${decisionLabel.toLowerCase()}.`,
+      feedback ? `Feedback: ${feedback}` : null,
+      deadline ? `Deadline: ${formatDateLabel(deadline)}` : null,
+      "Open DTMS to review the decision.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    html: buildPremiumEmail({
+      eyebrow: `DTMS ${decisionLabel}`,
+      title,
+      intro: `Your task <strong>${taskTitle}</strong> has been <strong>${decisionLabel.toLowerCase()}</strong>.`,
+      actionLabel: "Open Task",
+      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
+      footerNote: isApproved
+        ? "Approval confirmed. You may continue in DTMS."
+        : "Review the feedback, revise your work, and resubmit when ready.",
+      accent,
+      accentSoft,
+      badgeTone: accent,
+      details: [
+        { label: "Task", value: taskTitle },
+        { label: "Decision", value: decisionLabel },
+        ...(feedback ? [{ label: "Feedback", value: feedback }] : []),
+      ],
+      extraHtml: deadline
+        ? buildCalendarPanel({
+            label: "Task deadline",
+          title: formatDateLabel(deadline) || "No deadline",
+          date: "Calendar view",
+          caption: "Use DTMS to track the final delivery date.",
+        })
+        : "",
+    }),
+  };
+}
+
+function serializeTask(task) {
+  return {
+    id: task.id,
     title: task.title,
     description: task.description,
     deadline: task.deadline,
     status: task.status,
-    assignedTo: task.assignedTo?._id ? String(task.assignedTo._id) : String(task.assignedTo),
-    assignedUser: task.assignedTo?._id
+    priority: task.priority,
+    assignedTo: task.userId,
+    assignedUser: task.user
       ? {
-          id: String(task.assignedTo._id),
-          name: task.assignedTo.name,
-          email: task.assignedTo.email,
-          role: task.assignedTo.role,
+          id: task.user.id,
+          name: task.user.name,
+          email: task.user.email,
+          role: task.user.role,
         }
       : undefined,
     submission: task.submission,
-    createdBy: task.createdBy?._id
-      ? {
-          id: String(task.createdBy._id),
-          name: task.createdBy.name,
-          email: task.createdBy.email,
-          role: task.createdBy.role,
-        }
-      : String(task.createdBy),
     reminders: task.reminders,
     review: task.review
       ? {
           decision: task.review.decision,
           feedback: task.review.feedback,
           reviewedAt: task.review.reviewedAt,
-          reviewedBy: task.review.reviewedBy?._id
-            ? {
-                id: String(task.review.reviewedBy._id),
-                name: task.review.reviewedBy.name,
-                email: task.review.reviewedBy.email,
-                role: task.review.reviewedBy.role,
-              }
-            : task.review.reviewedBy
-              ? String(task.review.reviewedBy)
-              : undefined,
+          reviewedBy: task.review.reviewedBy,
         }
       : undefined,
     createdAt: task.createdAt,
@@ -54,12 +214,14 @@ function serializeTask(taskDoc) {
 
 export async function getTasks(req, res, next) {
   try {
-    const filter = req.user.role === "admin" ? {} : { assignedTo: req.user._id };
-    const tasks = await Task.find(filter)
-      .populate("assignedTo", "name email role")
-      .populate("createdBy", "name email role")
-      .populate("review.reviewedBy", "name email role")
-      .sort({ createdAt: -1 });
+    const where = req.user.role === "ADMIN" ? {} : { userId: req.user.id };
+    const tasks = await prisma.task.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
     return res.json({
       tasks: tasks.map(serializeTask),
@@ -71,35 +233,59 @@ export async function getTasks(req, res, next) {
 
 export async function createTask(req, res, next) {
   try {
-    const { title, description, deadline, assignedUser, assignedUserId, assignedTo, status } =
-      req.body;
+    const { title, description, deadline, assignedUser, assignedUserId, assignedTo, status } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({ message: "Title is required" });
     }
 
     const targetUserId = assignedUserId || assignedUser || assignedTo;
-    if (!targetUserId || !mongoose.isValidObjectId(targetUserId)) {
+    if (!targetUserId) {
       return res.status(400).json({ message: "A valid assigned user is required" });
     }
 
-    const exists = await User.exists({ _id: targetUserId });
-    if (!exists) {
+    const userCount = await prisma.user.count({ where: { id: targetUserId } });
+    if (userCount === 0) {
       return res.status(404).json({ message: "Assigned user not found" });
     }
 
-    const task = await Task.create({
-      title: title.trim(),
-      description: description?.trim(),
-      deadline: deadline ? new Date(deadline) : undefined,
-      assignedTo: targetUserId,
-      status: status || "Pending",
-      createdBy: req.user._id,
+    const task = await prisma.task.create({
+      data: {
+        title: title.trim(),
+        description: description?.trim(),
+        deadline: deadline ? new Date(deadline) : undefined,
+        status: status || "PENDING",
+        userId: targetUserId,
+      },
     });
 
-    const populated = await Task.findById(task._id)
-      .populate("assignedTo", "name email role")
-      .populate("createdBy", "name email role");
+    const populated = await prisma.task.findUnique({
+      where: { id: task.id },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    });
+
+    if (populated?.user?.email) {
+      try {
+        const assignmentEmail = buildAssignedTaskEmail({
+          taskTitle: populated.title,
+          description: populated.description || "",
+          status: populated.status,
+          deadline: populated.deadline,
+          assigneeName: populated.user.name,
+        });
+
+        await sendEmail({
+          to: populated.user.email,
+          subject: assignmentEmail.subject,
+          text: assignmentEmail.text,
+          html: assignmentEmail.html,
+        });
+      } catch (emailError) {
+        console.error("Task assignment email failed", emailError);
+      }
+    }
 
     return res.status(201).json({
       task: serializeTask(populated),
@@ -123,24 +309,38 @@ export async function updateTask(req, res, next) {
       submissionText,
       submissionFileName,
       submissionFileUrl,
+      submissionFileData,
       reviewDecision,
       reviewFeedback,
     } = req.body;
 
-    if (!mongoose.isValidObjectId(taskId)) {
+    if (!taskId) {
       return res.status(400).json({ message: "Invalid task id" });
     }
 
-    const existing = await Task.findById(taskId).populate("createdBy", "name email role");
+    const existing = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { user: { select: { id: true, name: true, email: true, role: true } } },
+    });
     if (!existing) {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    const isAdmin = req.user.role === "admin";
-    const isOwner = String(existing.assignedTo) === String(req.user._id);
+    const isAdmin = req.user.role === "ADMIN";
+    const isOwner = String(existing.userId) === String(req.user.id);
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ message: "You can only update your assigned tasks" });
     }
+
+    const adminTaskFieldsTouched =
+      isAdmin &&
+      (typeof title === "string" ||
+        typeof description === "string" ||
+        deadline !== undefined ||
+        typeof status === "string" ||
+        assignedUser !== undefined ||
+        assignedUserId !== undefined ||
+        assignedTo !== undefined);
 
     const update = {};
     if (isAdmin) {
@@ -153,76 +353,137 @@ export async function updateTask(req, res, next) {
           decision: reviewDecision,
           feedback: reviewFeedback ? String(reviewFeedback).trim() : "",
           reviewedAt: new Date(),
-          reviewedBy: req.user._id,
+          reviewedBy: req.user.id,
         };
-        update.status = reviewDecision === "Approved" ? "Completed" : "Rejected";
+        update.status = reviewDecision === "Approved" ? "COMPLETED" : "REJECTED";
       }
     } else {
-      // Users can update only their status + submission info.
       if (typeof status === "string") update.status = status;
       if (
         submissionText !== undefined ||
         submissionFileName !== undefined ||
-        submissionFileUrl !== undefined
+        submissionFileUrl !== undefined ||
+        submissionFileData !== undefined
       ) {
+        let nextSubmissionFileUrl = submissionFileUrl ? String(submissionFileUrl).trim() : undefined;
+
+        if (submissionFileData) {
+          nextSubmissionFileUrl = await saveUploadedSubmission({
+            fileName: submissionFileName,
+            fileData: submissionFileData,
+          });
+
+          if (existing.submission?.fileUrl && existing.submission.fileUrl !== nextSubmissionFileUrl) {
+            await removeStoredUpload(existing.submission.fileUrl);
+          }
+        } else if (existing.submission?.fileUrl && existing.submission.fileUrl !== nextSubmissionFileUrl) {
+          await removeStoredUpload(existing.submission.fileUrl);
+        }
+
         update.submission = {
           text: submissionText ? String(submissionText).trim() : undefined,
           fileName: submissionFileName ? String(submissionFileName).trim() : undefined,
-          fileUrl: submissionFileUrl ? String(submissionFileUrl).trim() : undefined,
+          fileUrl: nextSubmissionFileUrl,
           submittedAt: new Date(),
         };
-        update.status = "Pending Review";
+        update.status = "PENDING_REVIEW";
       }
     }
 
     const targetUserId = assignedUserId || assignedUser || assignedTo;
     if (isAdmin && targetUserId !== undefined) {
-      if (!mongoose.isValidObjectId(targetUserId)) {
+      if (!targetUserId) {
         return res.status(400).json({ message: "Invalid assigned user id" });
       }
-      const exists = await User.exists({ _id: targetUserId });
-      if (!exists) {
+      const userCount = await prisma.user.count({ where: { id: targetUserId } });
+      if (userCount === 0) {
         return res.status(404).json({ message: "Assigned user not found" });
       }
-      update.assignedTo = targetUserId;
+      update.userId = targetUserId;
     }
 
-    const task = await Task.findByIdAndUpdate(taskId, update, { returnDocument: 'after' })
-      .populate("assignedTo", "name email role")
-      .populate("createdBy", "name email role")
-      .populate("review.reviewedBy", "name email role")
-      .exec();
-
-    if (!task) {
-      return res.status(404).json({ message: "Task not found" });
-    }
+    const task = await prisma.task.update({
+      where: { id: taskId },
+      data: update,
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    });
 
     const submissionSaved =
       !isAdmin &&
       (submissionText !== undefined || submissionFileName !== undefined || submissionFileUrl !== undefined);
 
-    if (submissionSaved && existing.createdBy?.email) {
+    const notificationEmail = process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
+
+    if (submissionSaved && notificationEmail) {
       try {
-        await sendEmail({
-          to: existing.createdBy.email,
-          subject: `DTMS Submission: "${task.title}" has been updated`,
-          text: `${req.user.name} submitted work for "${task.title}".`,
-          html: `
-            <div style="font-family: Inter, Arial, sans-serif; color: #0f172a;">
-              <h2 style="margin-bottom: 12px;">Task submission received</h2>
-              <p><strong>${req.user.name}</strong> submitted work for <strong>${task.title}</strong>.</p>
-              <p>Status: <strong>${task.status}</strong></p>
-            </div>
-          `,
+        const taskUpdateEmail = buildSubmissionNotificationEmail({
+          taskTitle: task.title,
+          status: task.status,
+          submissionText: submissionText ? String(submissionText).trim() : "",
+          submissionFileName: submissionFileName ? String(submissionFileName).trim() : "",
         });
 
-        task.reminders = {
-          ...task.reminders,
-          submissionSentAt: new Date(),
-        };
-        await task.save();
+        await sendEmail({
+          to: notificationEmail,
+          subject: taskUpdateEmail.subject,
+          text: taskUpdateEmail.text,
+          html: taskUpdateEmail.html,
+        });
+
+        await prisma.task.update({
+          where: { id: task.id },
+          data: {
+            reminders: {
+              ...task.reminders,
+              submissionSentAt: new Date(),
+            },
+          },
+        });
       } catch (emailError) {
         console.error("Submission email failed", emailError);
+      }
+    }
+
+    if (isAdmin && adminTaskFieldsTouched && task.user?.email) {
+      try {
+        const assignmentEmail = buildAssignedTaskEmail({
+          taskTitle: task.title,
+          description: task.description || "",
+          status: task.status,
+          deadline: task.deadline,
+          assigneeName: task.user.name,
+        });
+
+        await sendEmail({
+          to: task.user.email,
+          subject: assignmentEmail.subject,
+          text: assignmentEmail.text,
+          html: assignmentEmail.html,
+        });
+      } catch (emailError) {
+        console.error("Task update email failed", emailError);
+      }
+    }
+
+    if (isAdmin && (reviewDecision === "Approved" || reviewDecision === "Rejected") && task.user?.email) {
+      try {
+        const decisionEmail = buildTaskDecisionEmail({
+          taskTitle: task.title,
+          decision: reviewDecision,
+          feedback: reviewFeedback ? String(reviewFeedback).trim() : "",
+          deadline: task.deadline,
+        });
+
+        await sendEmail({
+          to: task.user.email,
+          subject: decisionEmail.subject,
+          text: decisionEmail.text,
+          html: decisionEmail.html,
+        });
+      } catch (emailError) {
+        console.error("Task decision email failed", emailError);
       }
     }
 
@@ -238,11 +499,11 @@ export async function deleteTask(req, res, next) {
   try {
     const { taskId } = req.params;
 
-    if (!mongoose.isValidObjectId(taskId)) {
+    if (!taskId) {
       return res.status(400).json({ message: "Invalid task id" });
     }
 
-    const deleted = await Task.findByIdAndDelete(taskId);
+    const deleted = await prisma.task.delete({ where: { id: taskId } }).catch(() => null);
     if (!deleted) {
       return res.status(404).json({ message: "Task not found" });
     }

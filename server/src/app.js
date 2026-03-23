@@ -3,15 +3,20 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import morgan from "morgan";
+import path from "path";
+import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDirectory = path.resolve(__dirname, "../uploads");
 
 function resolveCorsOrigin(origin, callback) {
   if (!origin) {
@@ -39,10 +44,11 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
+app.use("/uploads", express.static(uploadsDirectory));
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -53,6 +59,7 @@ app.get("/", (req, res) => {
       "POST /api/auth/login",
       "POST /api/auth/forgot-password",
       "POST /api/auth/reset-password",
+      "POST /api/auth/reset-password/:token",
       "GET /api/auth/verify-email/:token",
       "GET /api/auth/me",
       "GET /api/tasks",

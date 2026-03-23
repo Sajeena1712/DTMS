@@ -42,6 +42,18 @@ export async function getCurrentUser() {
 }
 
 /**
+ * Resend verification email for an unverified account
+ * @param {string} email - User email
+ * @returns {Promise} - { message }
+ */
+export async function resendVerificationEmail(email) {
+  return safeRequest(
+    () => api.post("/auth/resend-verification", { email }),
+    "Failed to resend verification email"
+  );
+}
+
+/**
  * Request password reset email
  * @param {string} email - User email
  * @returns {Promise} - { message }

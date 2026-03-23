@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import api, { safeRequest } from "../../api/client";
-import { statusTone, taskStatuses, taskVisuals } from "../../lib/constants";
+import { displayTaskStatus, normalizeTaskStatus, statusTone, taskStatuses, taskVisuals } from "../../lib/constants";
 
 const defaultForm = {
   title: "",
   description: "",
   assignedUserId: "",
-  status: "Pending",
+  status: "PENDING",
   deadline: "",
   image: taskVisuals[0],
 };
@@ -29,7 +29,7 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
           initialValues.assignedTo ??
           initialValues.assignedUser?.id ??
           "",
-        status: initialValues.status ?? "Pending",
+        status: normalizeTaskStatus(initialValues.status ?? "PENDING"),
         deadline: initialValues.deadline
           ? new Date(initialValues.deadline).toISOString().slice(0, 10)
           : "",
@@ -218,7 +218,7 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
                 >
                   {taskStatuses.map((status) => (
                     <option key={status} value={status} className="text-slate-900">
-                      {status}
+                      {displayTaskStatus(status)}
                     </option>
                   ))}
                 </select>
@@ -257,8 +257,8 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
               <img src={form.image} alt={form.title || "Task preview"} className="h-full w-full object-cover" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.10),rgba(2,6,23,0.78))]" />
               <div className="absolute left-5 top-5">
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[form.status]}`}>
-                  {form.status}
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[normalizeTaskStatus(form.status)]}`}>
+                  {displayTaskStatus(form.status)}
                 </span>
               </div>
               <div className="absolute inset-x-0 bottom-0 p-5 text-white">

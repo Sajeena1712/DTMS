@@ -11,14 +11,18 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid()) @map("_id")
-  email         String   @unique
-  password      String
-  name          String?
-  role          Role     @default(USER)
-  emailVerified Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                        String   @id @default(cuid()) @map("_id")
+  email                     String   @unique
+  password                  String
+  name                      String?
+  role                      Role     @default(USER)
+  emailVerified             Boolean  @default(false)
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash    String?
+  passwordResetExpiresAt    DateTime?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   tasks        Task[]
   applications Application[]
@@ -30,10 +34,14 @@ model Task {
   id          String     @id @default(cuid()) @map("_id")
   title       String
   description String?
+  deadline    DateTime?
   status      TaskStatus @default(PENDING)
   priority    Priority   @default(MEDIUM)
   userId      String
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission  Json?
+  reminders   Json?
+  review      Json?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -65,7 +73,9 @@ enum Role {
 enum TaskStatus {
   PENDING
   IN_PROGRESS
+  PENDING_REVIEW
   COMPLETED
+  REJECTED
 }
 
 enum Priority {

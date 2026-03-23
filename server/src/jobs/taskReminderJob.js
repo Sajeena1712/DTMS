@@ -1,5 +1,6 @@
 import Task from "../models/Task.js";
 import { sendEmail } from "../utils/sendEmail.js";
+import { buildCalendarPanel, buildPremiumEmail, formatDateLabel } from "../utils/emailTemplates.js";
 
 const THREE_DAYS_IN_MS = 3 * 24 * 60 * 60 * 1000;
 const TWELVE_HOURS_IN_MS = 12 * 60 * 60 * 1000;
@@ -9,17 +10,36 @@ async function sendDeadlineReminder(task) {
     return;
   }
 
+  const deadlineLabel = formatDateLabel(task.deadline);
+
   await sendEmail({
     to: task.assignedTo.email,
-    subject: `DTMS Reminder: "${task.title}" is due soon`,
-    text: `Your task "${task.title}" is due on ${new Date(task.deadline).toLocaleDateString()}. Please complete it before the deadline.`,
-    html: `
-      <div style="font-family: Inter, Arial, sans-serif; color: #0f172a;">
-        <h2 style="margin-bottom: 12px;">DTMS deadline reminder</h2>
-        <p>Your task <strong>${task.title}</strong> is due on <strong>${new Date(task.deadline).toLocaleDateString()}</strong>.</p>
-        <p>Please review the task and submit your work before the deadline.</p>
-      </div>
-    `,
+    subject: `DTMS deadline reminder: ${task.title}`,
+    text: [
+      `Your task "${task.title}" is due on ${deadlineLabel}.`,
+      "Please review your progress and submit before the deadline.",
+    ].join("\n"),
+    html: buildPremiumEmail({
+      eyebrow: "DTMS Deadline Reminder",
+      title: "Deadline approaching",
+      intro: `Your task <strong>${task.title}</strong> is nearing its deadline.`,
+      actionLabel: "Open Task",
+      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
+      footerNote: "Review the task in DTMS and submit before the deadline.",
+      accent: "#c2410c",
+      accentSoft: "#ffedd5",
+      badgeTone: "#c2410c",
+      details: [
+        { label: "Task", value: task.title },
+        { label: "Due Date", value: deadlineLabel || "Scheduled soon" },
+      ],
+      extraHtml: buildCalendarPanel({
+        label: "Calendar view",
+        title: deadlineLabel || "Upcoming deadline",
+        date: "Mark this date in your calendar",
+        caption: "Use DTMS to review unfinished steps before the due date.",
+      }),
+    }),
   });
 }
 
@@ -29,7 +49,7 @@ export async function runTaskReminderJob() {
 
   const dueSoonTasks = await Task.find({
     deadline: { $gte: now, $lte: upcomingWindow },
-    status: { $ne: "Completed" },
+    status: { $ne: "COMPLETED" },
     $or: [
       { "reminders.dueSoonSentAt": { $exists: false } },
       { "reminders.dueSoonSentAt": null },

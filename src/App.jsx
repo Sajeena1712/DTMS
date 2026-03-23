@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { TaskProvider } from "./contexts/TaskContext";
 import AppShell from "./components/layout/AppShell";
 import FullscreenLoader from "./components/ui/FullscreenLoader";
+import { isAdminRole, isUserRole } from "./lib/constants";
 
 const IntroVideoPage = lazy(() => import("./pages/IntroVideoPage"));
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
@@ -41,21 +42,22 @@ function ProtectedRoute({ children }) {
 
 function RoleRoute({ allowedRole, children }) {
   const { user } = useAuth();
-  if (user?.role !== allowedRole) {
-    return <Navigate to={user?.role === "admin" ? "/admin-dashboard" : "/user-dashboard"} replace />;
+  const isAllowed = allowedRole === "admin" ? isAdminRole(user?.role) : isUserRole(user?.role);
+  if (!isAllowed) {
+    return <Navigate to={isAdminRole(user?.role) ? "/admin-dashboard" : "/user-dashboard"} replace />;
   }
   return children;
 }
 
 function AuthedLayout() {
   const { user } = useAuth();
-  return <AppShell variant={user?.role === "admin" ? "admin" : "user"}><Outlet /></AppShell>;
+  return <AppShell variant={isAdminRole(user?.role) ? "admin" : "user"}><Outlet /></AppShell>;
 }
 
 function PublicOnlyRoute({ children }) {
   const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return children;
-  return <Navigate to={user?.role === "admin" ? "/admin-dashboard" : "/user-dashboard"} replace />;
+  return <Navigate to={isAdminRole(user?.role) ? "/admin-dashboard" : "/user-dashboard"} replace />;
 }
 
 function RouteLoader() {
@@ -74,7 +76,7 @@ function IntroGate({ children }) {
     targetRef.current =
       path ||
       (isAuthenticated
-        ? user?.role === "admin"
+        ? isAdminRole(user?.role)
           ? "/admin-dashboard"
           : "/user-dashboard"
         : "/login");

@@ -9,6 +9,24 @@ const api = axios.create({
   },
 });
 
+export function resolveApiUrl(path) {
+  if (!path || typeof path !== "string") {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const baseUrl = api.defaults.baseURL || "/api";
+
+  if (/^https?:\/\//i.test(baseUrl)) {
+    return new URL(path, baseUrl).toString();
+  }
+
+  return path;
+}
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("dtms_token");
 

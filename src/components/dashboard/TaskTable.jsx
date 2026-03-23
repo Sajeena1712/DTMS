@@ -1,10 +1,11 @@
 import { cn } from "../../lib/utils";
-import { statusTone } from "../../lib/constants";
+import { displayTaskStatus, normalizeTaskStatus, statusTone } from "../../lib/constants";
 
 export default function TaskTable({
   tasks,
   onEdit,
   onDelete,
+  onView,
   onApprove,
   onReject,
   theme = "light",
@@ -64,13 +65,27 @@ export default function TaskTable({
                   ) : null}
                 </td>
                 <td className="px-6 py-5">
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[task.status]}`}>
-                    {task.status}
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[normalizeTaskStatus(task.status)]}`}>
+                    {displayTaskStatus(task.status)}
                   </span>
                 </td>
                 <td className={cn("px-6 py-5", theme === "dark" ? "text-slate-300" : "text-slate-600")}>{task.dueDate}</td>
                 <td className="px-6 py-5">
                   <div className="flex flex-wrap gap-3">
+                    {onView ? (
+                      <button
+                        type="button"
+                        onClick={() => onView(task)}
+                        className={cn(
+                          "rounded-2xl px-4 py-2 text-xs font-semibold transition hover:-translate-y-0.5",
+                          theme === "dark"
+                            ? "border border-sky-400/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/20"
+                            : "border border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100",
+                        )}
+                      >
+                        View
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => onEdit(task)}
@@ -84,13 +99,13 @@ export default function TaskTable({
                       className={cn(
                         "rounded-2xl px-4 py-2 text-xs font-semibold transition hover:-translate-y-0.5",
                         theme === "dark"
-                          ? "border border-white/12 bg-white/6 text-slate-200 hover:bg-white/10"
+                          ? "border border-slate-200 bg-white text-slate-950 hover:border-slate-300 hover:bg-slate-100"
                           : "border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white",
                       )}
                     >
                       Delete
                     </button>
-                    {onApprove && task.status === "Pending Review" ? (
+                    {onApprove && normalizeTaskStatus(task.status) === "PENDING_REVIEW" ? (
                       <button
                         type="button"
                         onClick={() => onApprove(task)}
@@ -99,7 +114,7 @@ export default function TaskTable({
                         Approve
                       </button>
                     ) : null}
-                    {onReject && task.status === "Pending Review" ? (
+                    {onReject && normalizeTaskStatus(task.status) === "PENDING_REVIEW" ? (
                       <button
                         type="button"
                         onClick={() => onReject(task)}

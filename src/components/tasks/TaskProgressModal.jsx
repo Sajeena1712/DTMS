@@ -21,6 +21,11 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const lateSubmissionReason = task?.reminders?.lateSubmissionReason?.trim() || "";
+  const isLateBlocked =
+    Boolean(task?.deadline) &&
+    !lateSubmissionReason &&
+    new Date(task.deadline).setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
 
   useEffect(() => {
     if (!open || !task) {
@@ -85,6 +90,15 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
               Fill in your progress, set the status, and submit the update. This flow is for users only.
             </p>
+            {lateSubmissionReason ? (
+              <p className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-7 text-emerald-700">
+                Late submission approved by admin. Reason: {lateSubmissionReason}
+              </p>
+            ) : isLateBlocked ? (
+              <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-700">
+                This deadline has passed. The form stays locked until an admin adds a late submission reason.
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -129,6 +143,7 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
                   value={link}
                   onChange={(event) => setLink(event.target.value)}
                   placeholder="https://..."
+                  disabled={isLateBlocked}
                   className="h-12 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300"
                 />
               </label>
@@ -140,6 +155,7 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
                 placeholder="Describe what you completed, what is blocked, or what you need next."
+                disabled={isLateBlocked}
                 className="min-h-36 rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300"
               />
             </label>
@@ -150,6 +166,7 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
                 type="file"
                 accept="image/*,.pdf,.doc,.docx,.zip"
                 onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+                disabled={isLateBlocked}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
               />
               <p className="text-xs text-slate-500">
@@ -190,10 +207,10 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
             <p className="text-sm text-slate-500">Click submit when you are ready to send the update.</p>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || isLateBlocked}
               className="rounded-2xl bg-[linear-gradient(90deg,#2563EB_0%,#7C3AED_100%)] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_45px_rgba(87,83,255,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {saving ? "Submitting..." : "Submit update"}
+              {saving ? "Submitting..." : isLateBlocked ? "Locked by deadline" : "Submit update"}
             </button>
           </div>
         </form>

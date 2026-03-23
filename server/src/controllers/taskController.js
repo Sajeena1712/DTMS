@@ -60,6 +60,44 @@ function formatTaskStatus(status) {
     .join(" ");
 }
 
+function isDateOverdue(deadline) {
+  if (!deadline) {
+    return false;
+  }
+
+  const deadlineDate = new Date(deadline);
+  if (Number.isNaN(deadlineDate.getTime())) {
+    return false;
+  }
+
+  return deadlineDate.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0);
+}
+
+function getLateSubmissionReason(reminders) {
+  if (!reminders || typeof reminders !== "object") {
+    return "";
+  }
+
+  return typeof reminders.lateSubmissionReason === "string" ? reminders.lateSubmissionReason.trim() : "";
+}
+
+function buildLateSubmissionReminder(reminders, lateSubmissionReason, allowedBy) {
+  const nextReminders = reminders && typeof reminders === "object" ? { ...reminders } : {};
+  const reason = typeof lateSubmissionReason === "string" ? lateSubmissionReason.trim() : "";
+
+  if (!reason) {
+    delete nextReminders.lateSubmissionReason;
+    delete nextReminders.lateSubmissionAllowedBy;
+    delete nextReminders.lateSubmissionAllowedAt;
+    return nextReminders;
+  }
+
+  nextReminders.lateSubmissionReason = reason;
+  nextReminders.lateSubmissionAllowedBy = allowedBy || null;
+  nextReminders.lateSubmissionAllowedAt = new Date();
+  return nextReminders;
+}
+
 function buildSubmissionNotificationEmail({ taskTitle, status, submissionText, submissionFileName }) {
   return {
     subject: `DTMS submission received: ${taskTitle}`,
@@ -233,7 +271,7 @@ export async function getTasks(req, res, next) {
 
 export async function createTask(req, res, next) {
   try {
-    const { title, description, deadline, assignedUser, assignedUserId, assignedTo, status } = req.body;
+    const { title, description, deadline, lateSubmissionReason, assignedUser, assignedUserId, assignedTo, status } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({ message: "Title is required" });
@@ -256,6 +294,7 @@ export async function createTask(req, res, next) {
         deadline: deadline ? new Date(deadline) : undefined,
         status: status || "PENDING",
         userId: targetUserId,
+        reminders: buildLateSubmissionReminder(undefined, lateSubmissionReason, req.user.id),
       },
     });
 
@@ -302,6 +341,7 @@ export async function updateTask(req, res, next) {
       title,
       description,
       deadline,
+      lateSubmissionReason,
       assignedUser,
       assignedUserId,
       assignedTo,
@@ -337,6 +377,7 @@ export async function updateTask(req, res, next) {
       (typeof title === "string" ||
         typeof description === "string" ||
         deadline !== undefined ||
+        lateSubmissionReason !== undefined ||
         typeof status === "string" ||
         assignedUser !== undefined ||
         assignedUserId !== undefined ||
@@ -347,6 +388,9 @@ export async function updateTask(req, res, next) {
       if (typeof title === "string") update.title = title.trim();
       if (typeof description === "string") update.description = description.trim();
       if (deadline !== undefined) update.deadline = deadline ? new Date(deadline) : null;
+      if (lateSubmissionReason !== undefined) {
+        update.reminders = buildLateSubmissionReminder(existing.reminders, lateSubmissionReason, req.user.id);
+      }
       if (typeof status === "string") update.status = status;
       if (reviewDecision === "Approved" || reviewDecision === "Rejected") {
         update.review = {
@@ -358,6 +402,13 @@ export async function updateTask(req, res, next) {
         update.status = reviewDecision === "Approved" ? "COMPLETED" : "REJECTED";
       }
     } else {
+      const lateSubmissionReason = getLateSubmissionReason(existing.reminders);
+      if (isDateOverdue(existing.deadline) && !lateSubmissionReason) {
+        return res.status(403).json({
+          message: "The deadline has passed. Ask an admin to add a late submission reason before opening this form.",
+        });
+      }
+
       if (typeof status === "string") update.status = status;
       if (
         submissionText !== undefined ||
@@ -387,6 +438,10 @@ export async function updateTask(req, res, next) {
           submittedAt: new Date(),
         };
         update.status = "PENDING_REVIEW";
+        update.reminders = {
+          ...(existing.reminders && typeof existing.reminders === "object" ? existing.reminders : {}),
+          submissionSentAt: new Date(),
+        };
       }
     }
 
@@ -430,16 +485,6 @@ export async function updateTask(req, res, next) {
           subject: taskUpdateEmail.subject,
           text: taskUpdateEmail.text,
           html: taskUpdateEmail.html,
-        });
-
-        await prisma.task.update({
-          where: { id: task.id },
-          data: {
-            reminders: {
-              ...task.reminders,
-              submissionSentAt: new Date(),
-            },
-          },
         });
       } catch (emailError) {
         console.error("Submission email failed", emailError);

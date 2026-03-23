@@ -5,6 +5,7 @@ import { formatDate } from "../../lib/utils";
 export default function TaskCard({ task, onOpen }) {
   const status = normalizeTaskStatus(task.status);
   const priority = normalizePriority(task.priority);
+  const lateSubmissionReason = task?.reminders?.lateSubmissionReason || task?.lateSubmissionReason || "";
 
   return (
     <motion.button
@@ -25,6 +26,11 @@ export default function TaskCard({ task, onOpen }) {
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${priorityTone[priority]}`}>
               {displayPriority(priority)} Priority
             </span>
+            {task.isOverdue ? (
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lateSubmissionReason ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                {lateSubmissionReason ? "Late access approved" : "Deadline passed"}
+              </span>
+            ) : null}
           </div>
           <div className="absolute inset-x-0 bottom-0 p-5 text-white">
             <p className="text-xs uppercase tracking-[0.28em] text-white/70">Click to update progress</p>
@@ -58,6 +64,13 @@ export default function TaskCard({ task, onOpen }) {
                 {task.submission?.text || "Open the task to add a progress note, upload a file, and update the status."}
               </p>
             </div>
+
+            {lateSubmissionReason ? (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-emerald-500">Late access reason</p>
+                <p className="mt-2 text-sm leading-7 text-slate-700">{lateSubmissionReason}</p>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-3 border-t border-slate-200/80 pt-5">

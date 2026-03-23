@@ -9,6 +9,7 @@ const defaultForm = {
   assignedUserId: "",
   status: "PENDING",
   deadline: "",
+  lateSubmissionReason: "",
   image: taskVisuals[0],
 };
 
@@ -33,6 +34,7 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
         deadline: initialValues.deadline
           ? new Date(initialValues.deadline).toISOString().slice(0, 10)
           : "",
+        lateSubmissionReason: initialValues.reminders?.lateSubmissionReason ?? initialValues.lateSubmissionReason ?? "",
         image: initialValues.image ?? defaultForm.image,
       });
     } else {
@@ -101,6 +103,7 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
         assignedUserId: form.assignedUserId,
         status: form.status,
         deadline: form.deadline || undefined,
+        lateSubmissionReason: form.lateSubmissionReason.trim() || undefined,
         image: form.image,
       });
       onClose();
@@ -203,6 +206,22 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
                 />
               </label>
             </div>
+
+            <label className="mt-4 grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
+                Late submission reason
+              </span>
+              <textarea
+                name="lateSubmissionReason"
+                value={form.lateSubmissionReason}
+                onChange={updateField}
+                placeholder="Add a valid reason to let the assignee open the form after the deadline."
+                className="min-h-24 rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none placeholder:text-white/45 transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+              />
+              <p className="text-xs leading-6 text-white/45">
+                Leave this blank if the task should close automatically when the deadline passes.
+              </p>
+            </label>
           </div>
 
           <div className="rounded-2xl border border-white/15 bg-white/8 p-4 backdrop-blur">

@@ -116,6 +116,11 @@ export default function TaskListPage() {
   }
 
   function openTaskForm(task) {
+    if (task.isOverdue && !task.canOpenAfterDeadline) {
+      toast.error("This task deadline has passed. Ask an admin to add a late submission reason.");
+      return;
+    }
+
     setWorkingTask(task);
   }
 

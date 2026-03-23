@@ -14,6 +14,7 @@ function decorateTasks(tasks) {
     const dueDate = deadline ? formatDate(deadline) : "--";
     const image = task.image || taskVisuals[index % taskVisuals.length];
     const status = normalizeTaskStatus(task.status);
+    const lateSubmissionReason = task.reminders?.lateSubmissionReason?.trim() || "";
     const isOverdue =
       Boolean(deadline) &&
       status !== "COMPLETED" &&
@@ -28,6 +29,8 @@ function decorateTasks(tasks) {
       dueDate,
       image,
       isOverdue,
+      lateSubmissionReason,
+      canOpenAfterDeadline: Boolean(lateSubmissionReason),
     };
   });
 }

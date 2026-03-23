@@ -100,6 +100,13 @@ export default function TaskSubmissionModal({ open, onClose, task }) {
           <DetailCard label="Review decision" value={task.review?.decision || "Awaiting review"} />
         </div>
 
+        {task?.reminders?.lateSubmissionReason ? (
+          <section className="mt-6 rounded-[28px] border border-emerald-200 bg-emerald-50/70 p-6">
+            <p className="text-xs uppercase tracking-[0.28em] text-emerald-600">Late access reason</p>
+            <p className="mt-3 text-sm leading-7 text-emerald-900">{task.reminders.lateSubmissionReason}</p>
+          </section>
+        ) : null}
+
         <section className="mt-6 rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(148,163,184,0.12)]">
           <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Task brief</p>
           <p className="mt-4 text-sm leading-7 text-slate-700">{task.description || "No task description available."}</p>

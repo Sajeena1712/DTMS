@@ -1,0 +1,46 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="1200" fill="#050816"/>
+  <rect width="1600" height="1200" fill="url(#paint0_radial)"/>
+  <rect width="1600" height="1200" fill="url(#paint1_radial)"/>
+  <rect x="150" y="120" width="1300" height="960" rx="44" fill="url(#paint2_linear)" fill-opacity="0.4" stroke="rgba(255,255,255,0.12)"/>
+  <circle cx="800" cy="430" r="170" fill="url(#paint3_radial)"/>
+  <circle cx="800" cy="430" r="126" fill="#D9EEFF" fill-opacity="0.88"/>
+  <path d="M720 392C720 350.026 754.026 316 796 316H820C876.333 316 922 361.667 922 418V460C922 520.751 872.751 570 812 570H796C754.026 570 720 535.974 720 494V392Z" fill="url(#paint4_linear)"/>
+  <path d="M760 392H860" stroke="#4EC5FF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M742 430H878" stroke="#7B8CFF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M760 468H844" stroke="#A8B5FF" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="870" cy="392" r="12" fill="#D9F8FF"/>
+  <circle cx="900" cy="430" r="12" fill="#F7E7FF"/>
+  <circle cx="854" cy="468" r="12" fill="#D9F8FF"/>
+  <rect x="660" y="674" width="280" height="16" rx="8" fill="url(#paint5_linear)"/>
+  <rect x="620" y="720" width="360" height="16" rx="8" fill="url(#paint5_linear)"/>
+  <rect x="570" y="766" width="460" height="16" rx="8" fill="url(#paint5_linear)"/>
+  <rect x="498" y="860" width="604" height="124" rx="30" fill="#07101F" fill-opacity="0.72" stroke="rgba(255,255,255,0.08)"/>
+  <text x="800" y="925" text-anchor="middle" fill="#EAF4FF" font-family="Arial, Helvetica, sans-serif" font-size="46" letter-spacing="8">DTMS VISUAL PLACEHOLDER</text>
+  <defs>
+    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(490 290) rotate(38.4078) scale(618.329 632.136)">
+      <stop stop-color="#1C7DFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#1C7DFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1058 420) rotate(145.305) scale(498.369 530.425)">
+      <stop stop-color="#8A63FF" stop-opacity="0.48"/>
+      <stop offset="1" stop-color="#8A63FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paint2_linear" x1="800" y1="120" x2="800" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#0A1120"/>
+    </linearGradient>
+    <radialGradient id="paint3_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(800 430) rotate(90) scale(170)">
+      <stop stop-color="#B4E5FF"/>
+      <stop offset="1" stop-color="#4E4EFF"/>
+    </radialGradient>
+    <linearGradient id="paint4_linear" x1="720" y1="316" x2="922" y2="570" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#D946EF"/>
+    </linearGradient>
+    <linearGradient id="paint5_linear" x1="620" y1="674" x2="980" y2="782" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3ABFF8"/>
+      <stop offset="1" stop-color="#C084FC"/>
+    </linearGradient>
+  </defs>
+</svg>

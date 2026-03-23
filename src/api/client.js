@@ -1,8 +1,11 @@
 import axios from "axios";
 import toast from "react-hot-toast";
 
+const productionApiBaseUrl = "https://dtms-backend-983n.onrender.com/api";
+const apiBaseUrl = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_BASE_URL || productionApiBaseUrl);
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: apiBaseUrl,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -18,7 +21,7 @@ export function resolveApiUrl(path) {
     return path;
   }
 
-  const baseUrl = api.defaults.baseURL || "/api";
+  const baseUrl = api.defaults.baseURL || apiBaseUrl;
 
   if (/^https?:\/\//i.test(baseUrl)) {
     return new URL(path, baseUrl).toString();

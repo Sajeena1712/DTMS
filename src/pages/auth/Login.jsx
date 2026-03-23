@@ -80,8 +80,8 @@ export default function Login() {
     resolver: zodResolver(schema),
     mode: "onChange",
     defaultValues: {
-      email: "admin@dtms.com",
-      password: "Admin@123",
+      email: "",
+      password: "",
     },
   });
 

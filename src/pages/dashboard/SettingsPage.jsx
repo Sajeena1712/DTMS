@@ -1,4 +1,5 @@
 import { useAuth } from "../../contexts/AuthContext";
+import { assetPath } from "../../lib/assetPaths";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ export default function SettingsPage() {
           <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Account</p>
           <div className="mt-5 rounded-[24px] border border-slate-200/80 bg-[linear-gradient(145deg,rgba(79,70,229,0.08),rgba(6,182,212,0.06),rgba(255,255,255,0.92))] p-5">
             <div className="flex items-center gap-4">
-              <img src="/logo.png" alt="DTMS logo" className="h-14 w-14 rounded-2xl object-cover shadow-md" />
+                <img src={assetPath("logo.png")} alt="DTMS logo" className="h-14 w-14 rounded-2xl object-cover shadow-md" />
               <div>
                 <p className="text-lg font-semibold text-slate-950">{user?.name}</p>
                 <p className="text-sm text-slate-600">{user?.email}</p>

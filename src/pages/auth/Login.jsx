@@ -7,6 +7,7 @@ import { z } from "zod";
 import { useAuth } from "../../contexts/AuthContext";
 import { isAdminRole } from "../../lib/constants";
 import { resendVerificationEmail } from "../../api/authApi";
+import { assetPath } from "../../lib/assetPaths";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -157,7 +158,7 @@ export default function Login() {
 
           <div className="absolute left-8 top-8 right-8 flex items-start justify-between gap-4">
             <div className="flex items-center gap-3 rounded-full border border-white/70 bg-white/55 px-4 py-2 backdrop-blur-xl">
-              <img src="/logo.png" alt="DTMS logo" className="h-9 w-9 rounded-xl object-cover shadow-md" />
+              <img src={assetPath("logo.png")} alt="DTMS logo" className="h-9 w-9 rounded-xl object-cover shadow-md" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-500">DTMS</p>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">AI Login Space</p>
@@ -215,7 +216,7 @@ export default function Login() {
             className="w-full max-w-xl rounded-[30px] border border-white/80 bg-white/68 p-8 shadow-[0_30px_90px_rgba(148,163,184,0.28)] backdrop-blur-2xl sm:p-10"
           >
             <div className="flex justify-center">
-              <img src="/logo.png" alt="DTMS logo" className="h-16 w-16 rounded-2xl object-cover shadow-[0_14px_36px_rgba(59,130,246,0.22)]" />
+              <img src={assetPath("logo.png")} alt="DTMS logo" className="h-16 w-16 rounded-2xl object-cover shadow-[0_14px_36px_rgba(59,130,246,0.22)]" />
             </div>
             <p className="mt-8 text-center text-xs uppercase tracking-[0.34em] text-slate-500">DTMS Access</p>
             <h2 className="mt-4 text-center text-4xl font-semibold text-slate-900">Sign In</h2>

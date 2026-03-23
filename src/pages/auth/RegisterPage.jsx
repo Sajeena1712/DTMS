@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showApiError } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
+import { assetPath } from "../../lib/assetPaths";
 
 const schema = z
   .object({
@@ -207,10 +208,10 @@ export default function RegisterPage() {
           >
             <div className="flex justify-center">
               <img
-                src="/logo.png"
-                alt="DTMS logo"
-                className="h-20 w-20 rounded-[24px] object-cover shadow-[0_18px_45px_rgba(59,130,246,0.24)]"
-              />
+                  src={assetPath("logo.png")}
+                  alt="DTMS logo"
+                  className="h-20 w-20 rounded-[24px] object-cover shadow-[0_18px_45px_rgba(59,130,246,0.24)]"
+                />
             </div>
             <p className="mt-8 text-center text-xs uppercase tracking-[0.34em] text-slate-500">DTMS Access</p>
             <h2 className="mt-4 text-center text-4xl font-semibold text-slate-900">Create Account</h2>

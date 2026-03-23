@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { showApiError } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
+import { assetPath } from "../../lib/assetPaths";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -157,7 +158,7 @@ export default function ForgotPasswordPage() {
           >
             <div className="flex justify-center">
               <img
-                src="/logo.png"
+                src={assetPath("logo.png")}
                 alt="DTMS logo"
                 className="h-20 w-20 rounded-[24px] object-cover shadow-[0_18px_45px_rgba(59,130,246,0.24)]"
               />

@@ -1,3 +1,5 @@
+import { assetPath } from "../../lib/assetPaths";
+
 export default function GlassLoadingScreen({
   title = "Initializing System...",
 }) {
@@ -15,7 +17,7 @@ export default function GlassLoadingScreen({
         <div className="relative flex justify-center">
           <div className="loader-logo-glow flex h-28 w-28 items-center justify-center rounded-[30px] border border-white/16 bg-slate-950/35">
             <img
-              src="/logo.png"
+              src={assetPath("logo.png")}
               alt="DTMS logo"
               className="loader-logo-pulse h-20 w-20 rounded-[24px] object-cover"
             />

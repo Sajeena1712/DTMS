@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { adminNavLinks, userNavLinks } from "../../lib/constants";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../contexts/AuthContext";
+import { assetPath } from "../../lib/assetPaths";
 
 const navIcons = {
   Dashboard: "D",
@@ -30,7 +31,7 @@ export default function AppShell({ children, variant }) {
             <div className="rounded-[28px] bg-[linear-gradient(145deg,#dbeafe_0%,#eff6ff_55%,#ffffff_100%)] p-5">
               <div className="flex items-center justify-center">
                 <img
-                  src="/logo.png"
+                  src={assetPath("logo.png")}
                   alt="DTMS logo"
                   className="h-24 w-24 rounded-[28px] object-cover shadow-[0_18px_40px_rgba(59,130,246,0.18)]"
                 />

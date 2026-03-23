@@ -20,7 +20,7 @@ export default function AppShell({ children, variant }) {
   return (
     <div className="relative h-screen overflow-hidden bg-slate-950 px-4 py-4 md:px-6 lg:px-8">
       <video className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop playsInline>
-        <source src="/workspace-bg.mp4" type="video/mp4" />
+        <source src={assetPath("workspace-bg.mp4")} type="video/mp4" />
       </video>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(239,246,255,0.88)_0%,rgba(248,251,255,0.86)_40%,rgba(255,255,255,0.92)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.12),transparent_30%)]" />

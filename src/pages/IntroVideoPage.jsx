@@ -1,4 +1,5 @@
 import GlassLoadingScreen from "../components/ui/GlassLoadingScreen";
+import { assetPath } from "../lib/assetPaths";
 
 export default function IntroVideoPage({ onFinish }) {
   return (
@@ -10,7 +11,7 @@ export default function IntroVideoPage({ onFinish }) {
         playsInline
         onEnded={onFinish}
       >
-        <source src="/intro-video.mp4" type="video/mp4" />
+        <source src={assetPath("intro-video.mp4")} type="video/mp4" />
       </video>
 
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.08),rgba(2,6,23,0.60))]" />

@@ -17,6 +17,7 @@ const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDirectory = path.resolve(__dirname, "../uploads");
+const vercelOriginPattern = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
 
 function resolveCorsOrigin(origin, callback) {
   if (!origin) {
@@ -25,6 +26,12 @@ function resolveCorsOrigin(origin, callback) {
   }
 
   if (origin === clientUrl) {
+    callback(null, true);
+    return;
+  }
+
+  // Allow Vercel preview and production deployments.
+  if (vercelOriginPattern.test(origin)) {
     callback(null, true);
     return;
   }

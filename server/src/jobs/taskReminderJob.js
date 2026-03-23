@@ -1,4 +1,4 @@
-import Task from "../models/Task.js";
+import prisma from "../lib/prisma.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { buildCalendarPanel, buildPremiumEmail, formatDateLabel } from "../utils/emailTemplates.js";
 
@@ -6,14 +6,14 @@ const THREE_DAYS_IN_MS = 3 * 24 * 60 * 60 * 1000;
 const TWELVE_HOURS_IN_MS = 12 * 60 * 60 * 1000;
 
 async function sendDeadlineReminder(task) {
-  if (!task.assignedTo?.email) {
+  if (!task.user?.email) {
     return;
   }
 
   const deadlineLabel = formatDateLabel(task.deadline);
 
   await sendEmail({
-    to: task.assignedTo.email,
+    to: task.user.email,
     subject: `DTMS deadline reminder: ${task.title}`,
     text: [
       `Your task "${task.title}" is due on ${deadlineLabel}.`,
@@ -47,25 +47,50 @@ export async function runTaskReminderJob() {
   const now = new Date();
   const upcomingWindow = new Date(now.getTime() + THREE_DAYS_IN_MS);
 
-  const dueSoonTasks = await Task.find({
-    deadline: { $gte: now, $lte: upcomingWindow },
-    status: { $ne: "COMPLETED" },
-    $or: [
-      { "reminders.dueSoonSentAt": { $exists: false } },
-      { "reminders.dueSoonSentAt": null },
-    ],
-  }).populate("assignedTo", "name email");
+  const dueSoonTasks = await prisma.task.findMany({
+    where: {
+      deadline: {
+        gte: now,
+        lte: upcomingWindow,
+      },
+      status: {
+        not: "COMPLETED",
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: {
+      deadline: "asc",
+    },
+  });
 
   for (const task of dueSoonTasks) {
+    if (task.reminders?.dueSoonSentAt) {
+      continue;
+    }
+
     try {
       await sendDeadlineReminder(task);
-      task.reminders = {
-        ...task.reminders,
-        dueSoonSentAt: new Date(),
-      };
-      await task.save();
+
+      await prisma.task.update({
+        where: { id: task.id },
+        data: {
+          reminders: {
+            ...(task.reminders ?? {}),
+            dueSoonSentAt: new Date(),
+          },
+        },
+      });
     } catch (error) {
-      console.error("Failed to send due-soon reminder", { taskId: String(task._id), error });
+      console.error("Failed to send due-soon reminder", { taskId: task.id, error });
     }
   }
 }

@@ -46,6 +46,11 @@ function buildAppUrl(req) {
   return origin && origin.startsWith("http") ? origin : fallback;
 }
 
+function buildClientRoute(req, path) {
+  const appUrl = buildAppUrl(req).replace(/\/$/, "");
+  return `${appUrl}/#${path}`;
+}
+
 function buildEmailLayout({ eyebrow, title, intro, actionLabel, actionUrl, footerNote }) {
   return `
     <div style="margin:0;background-color:#f8fafc;padding:32px 16px;font-family:Inter,Arial,sans-serif;color:#0f172a;">
@@ -85,8 +90,7 @@ function buildEmailLayout({ eyebrow, title, intro, actionLabel, actionUrl, foote
 }
 
 async function sendVerificationEmail(req, user, verificationToken) {
-  const appUrl = buildAppUrl(req);
-  const verifyLink = `${appUrl}/verify-email/${verificationToken}`;
+  const verifyLink = buildClientRoute(req, `/verify-email/${verificationToken}`);
 
   if (process.env.NODE_ENV !== "production") {
     console.log("Verification link (dev):", verifyLink);
@@ -346,8 +350,7 @@ export async function forgotPassword(req, res, next) {
       },
     });
 
-    const appUrl = buildAppUrl(req);
-    const resetLink = `${appUrl}/reset-password/${resetToken}`;
+    const resetLink = buildClientRoute(req, `/reset-password/${resetToken}`);
     if (process.env.NODE_ENV !== "production") {
       console.log("Reset link (dev):", resetLink);
     }

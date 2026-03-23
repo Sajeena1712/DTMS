@@ -1,12 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig(({ command }) => ({
+export default defineConfig({
   build: {
     outDir: "dist",
   },
   plugins: [react()],
-  base: command === "serve" ? "/" : "/DTMS/",
+  base: process.env.VERCEL ? "/" : "/DTMS/",
   server: {
     port: 5173,
     proxy: {
@@ -20,4 +20,4 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
-}));
+});

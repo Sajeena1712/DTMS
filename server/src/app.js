@@ -1,0 +1,75 @@
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import dotenv from "dotenv";
+import express from "express";
+import morgan from "morgan";
+import authRoutes from "./routes/authRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
+import userRoutes from "./routes/userRoutes.js";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+
+dotenv.config();
+
+const app = express();
+const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+
+function resolveCorsOrigin(origin, callback) {
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+
+  if (origin === clientUrl) {
+    callback(null, true);
+    return;
+  }
+
+  // Allow local frontend dev servers (Vite may auto-switch ports).
+  if (process.env.NODE_ENV !== "production" && /^http:\/\/localhost:\d+$/i.test(origin)) {
+    callback(null, true);
+    return;
+  }
+
+  callback(new Error(`CORS blocked for origin: ${origin}`));
+}
+
+app.use(
+  cors({
+    origin: resolveCorsOrigin,
+    credentials: true,
+  }),
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(morgan("dev"));
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    message: "Digital Talent Management System API",
+    version: "2.0.0",
+    endpoints: [
+      "POST /api/auth/register",
+      "POST /api/auth/login",
+      "POST /api/auth/forgot-password",
+      "POST /api/auth/reset-password",
+      "GET /api/auth/verify-email/:token",
+      "GET /api/auth/me",
+      "GET /api/tasks",
+      "POST /api/tasks",
+      "PUT /api/tasks/:taskId",
+      "DELETE /api/tasks/:taskId",
+      "GET /api/user/dashboard",
+    ],
+  });
+});
+
+app.use("/api/auth", authRoutes);
+app.use("/api", authRoutes); // keeps legacy /api/login working
+app.use("/api/tasks", taskRoutes);
+app.use("/api/user", userRoutes);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+export default app;

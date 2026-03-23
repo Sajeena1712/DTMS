@@ -1,0 +1,120 @@
+import { cn } from "../../lib/utils";
+import { statusTone } from "../../lib/constants";
+
+export default function TaskTable({
+  tasks,
+  onEdit,
+  onDelete,
+  onApprove,
+  onReject,
+  theme = "light",
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-[28px] border backdrop-blur-xl",
+        theme === "dark"
+          ? "border-white/10 bg-white/5 shadow-[0_22px_60px_rgba(2,6,23,0.42)]"
+          : "task-panel",
+      )}
+    >
+      <div className={cn("flex items-center justify-between gap-4 border-b px-6 py-5", theme === "dark" ? "border-white/10" : "border-slate-200/80")}>
+        <div>
+          <p className={cn("text-lg font-semibold", theme === "dark" ? "text-white" : "text-slate-950")}>Task table</p>
+          <p className={cn("mt-1 text-sm", theme === "dark" ? "text-slate-400" : "text-slate-500")}>
+            Track assignments, deadlines, approvals, and task actions from one workspace.
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className={cn(theme === "dark" ? "bg-white/[0.04] text-slate-400" : "bg-slate-50/80 text-slate-500")}>
+            <tr>
+              <th className="px-6 py-4 font-medium">Task Image</th>
+              <th className="px-6 py-4 font-medium">Title</th>
+              <th className="px-6 py-4 font-medium">Status</th>
+              <th className="px-6 py-4 font-medium">Deadline</th>
+              <th className="px-6 py-4 font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((task) => (
+              <tr
+                key={task.id}
+                className={cn(
+                  "border-t transition-all duration-300",
+                  theme === "dark"
+                    ? "border-white/10 hover:bg-white/[0.04]"
+                    : "border-slate-200/70 bg-white/45 hover:bg-white/90",
+                )}
+              >
+                <td className="px-6 py-5">
+                  <img src={task.image} alt={task.title} className="h-14 w-20 rounded-2xl object-cover shadow-md" />
+                </td>
+                <td className="px-6 py-5">
+                  <p className={cn("font-semibold", theme === "dark" ? "text-white" : "text-slate-950")}>{task.title}</p>
+                  <p className={cn("mt-1 max-w-sm text-xs leading-6", theme === "dark" ? "text-slate-400" : "text-slate-500")}>
+                    {task.description}
+                  </p>
+                  {task.review?.feedback ? (
+                    <p className={cn("mt-2 max-w-sm text-xs leading-6", theme === "dark" ? "text-slate-300" : "text-slate-600")}>
+                      Feedback: {task.review.feedback}
+                    </p>
+                  ) : null}
+                </td>
+                <td className="px-6 py-5">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[task.status]}`}>
+                    {task.status}
+                  </span>
+                </td>
+                <td className={cn("px-6 py-5", theme === "dark" ? "text-slate-300" : "text-slate-600")}>{task.dueDate}</td>
+                <td className="px-6 py-5">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(task)}
+                      className="rounded-2xl bg-gradient-to-r from-[#4F46E5] via-[#06B6D4] to-[#A855F7] px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_rgba(79,70,229,0.22)]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(task.id)}
+                      className={cn(
+                        "rounded-2xl px-4 py-2 text-xs font-semibold transition hover:-translate-y-0.5",
+                        theme === "dark"
+                          ? "border border-white/12 bg-white/6 text-slate-200 hover:bg-white/10"
+                          : "border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white",
+                      )}
+                    >
+                      Delete
+                    </button>
+                    {onApprove && task.status === "Pending Review" ? (
+                      <button
+                        type="button"
+                        onClick={() => onApprove(task)}
+                        className="rounded-2xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_rgba(16,185,129,0.22)]"
+                      >
+                        Approve
+                      </button>
+                    ) : null}
+                    {onReject && task.status === "Pending Review" ? (
+                      <button
+                        type="button"
+                        onClick={() => onReject(task)}
+                        className="rounded-2xl bg-rose-500 px-4 py-2 text-xs font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_rgba(244,63,94,0.22)]"
+                      >
+                        Reject
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

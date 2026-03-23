@@ -1,0 +1,123 @@
+{
+  "info": {
+    "name": "DTMS API",
+    "_postman_id": "7f7b3c43-5e12-4d4e-94e4-dtms-collection",
+    "description": "Postman collection for the Digital Talent Management System backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "token", "value": "" },
+    { "key": "resetToken", "value": "" },
+    { "key": "verifyToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sajeena\",\n  \"email\": \"sajeena@example.com\",\n  \"password\": \"Sajeena@2004\",\n  \"confirmPassword\": \"Sajeena@2004\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/register"
+      }
+    },
+    {
+      "name": "Auth - Verify Email (GET)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/auth/verify-email/{{verifyToken}}"
+      }
+    },
+    {
+      "name": "Auth - Login (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@dtms.com\",\n  \"password\": \"Admin@123\"\n}"
+        },
+        "url": "{{baseUrl}}/login"
+      }
+    },
+    {
+      "name": "Auth - Forgot Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@dtms.com\"\n}" },
+        "url": "{{baseUrl}}/auth/forgot-password"
+      }
+    },
+    {
+      "name": "Auth - Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"password\": \"NewPass@123\",\n  \"confirmPassword\": \"NewPass@123\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/reset-password"
+      }
+    },
+    {
+      "name": "Tasks - Get Tasks",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/tasks"
+      }
+    },
+    {
+      "name": "Tasks - Create Task (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"DTMS Onboarding Task\",\n  \"description\": \"Complete your DTMS onboarding checklist and submit a short update.\",\n  \"deadline\": \"2026-03-25\",\n  \"assignedUserId\": \"<PUT_USER_ID_HERE>\",\n  \"status\": \"Pending\"\n}"
+        },
+        "url": "{{baseUrl}}/tasks"
+      }
+    },
+    {
+      "name": "Tasks - Update Task (Admin)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"DTMS Onboarding Task (Updated)\",\n  \"status\": \"In Progress\"\n}" },
+        "url": "{{baseUrl}}/tasks/<PUT_TASK_ID_HERE>"
+      }
+    },
+    {
+      "name": "Tasks - Update Task Status (User)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"Completed\",\n  \"submissionText\": \"Finished the onboarding checklist.\"\n}" },
+        "url": "{{baseUrl}}/tasks/<PUT_TASK_ID_HERE>"
+      }
+    },
+    {
+      "name": "Tasks - Delete Task (Admin)",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/tasks/<PUT_TASK_ID_HERE>"
+      }
+    }
+  ]
+}

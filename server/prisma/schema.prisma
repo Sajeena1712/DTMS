@@ -1,0 +1,82 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid()) @map("_id")
+  email         String   @unique
+  password      String
+  name          String?
+  role          Role     @default(USER)
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tasks        Task[]
+  applications Application[]
+
+  @@map("users")
+}
+
+model Task {
+  id          String     @id @default(cuid()) @map("_id")
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  priority    Priority   @default(MEDIUM)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId])
+  @@map("tasks")
+}
+
+model Application {
+  id       String            @id @default(cuid()) @map("_id")
+  userId   String
+  company  String
+  role     String
+  salary   String
+  location String
+  status   ApplicationStatus @default(APPLIED)
+  date     DateTime
+  image    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("applications")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ApplicationStatus {
+  APPLIED
+  INTERVIEW
+  SELECTED
+  REJECTED
+}

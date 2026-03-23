@@ -1,0 +1,240 @@
+import { useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { motion } from "framer-motion";
+import TaskCard from "../../components/tasks/TaskCard";
+import TaskModal from "../../components/tasks/TaskModal";
+import TaskTable from "../../components/dashboard/TaskTable";
+import { showApiError } from "../../api/client";
+import { useAuth } from "../../contexts/AuthContext";
+import { useTasks } from "../../contexts/TaskContext";
+import { taskStatuses } from "../../lib/constants";
+
+export default function TaskListPage() {
+  const { tasks, loading, createTask, updateTask, deleteTask } = useTasks();
+  const { user } = useAuth();
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+
+  const filteredTasks = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return tasks.filter((task) => {
+      const matchesStatus = statusFilter === "All" || task.status === statusFilter;
+      const matchesQuery =
+        !normalizedQuery ||
+        [task.title, task.description, task.assignedUserName, task.status]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(normalizedQuery));
+
+      return matchesStatus && matchesQuery;
+    });
+  }, [query, statusFilter, tasks]);
+
+  async function handleDelete(taskId) {
+    try {
+      await deleteTask(taskId);
+      toast.success("Task deleted");
+    } catch (error) {
+      showApiError(error, "Failed to delete task");
+    }
+  }
+
+  async function handleCreate(values) {
+    try {
+      await createTask(values);
+      toast.success("Task created");
+      setModalOpen(false);
+      setEditingTask(null);
+    } catch (error) {
+      showApiError(error, "Failed to create task");
+      throw error;
+    }
+  }
+
+  async function handleUpdate(values) {
+    try {
+      await updateTask(editingTask.id, values);
+      toast.success("Task updated");
+      setModalOpen(false);
+      setEditingTask(null);
+    } catch (error) {
+      showApiError(error, "Failed to update task");
+      throw error;
+    }
+  }
+
+  async function handleApprove(task) {
+    const feedback = window.prompt("Approval feedback for the user (optional):", task.review?.feedback ?? "") ?? "";
+
+    try {
+      await updateTask(task.id, {
+        reviewDecision: "Approved",
+        reviewFeedback: feedback,
+      });
+      toast.success("Task approved");
+    } catch (error) {
+      showApiError(error, "Failed to approve task");
+    }
+  }
+
+  async function handleReject(task) {
+    const feedback = window.prompt("Enter rejection feedback for the user:", task.review?.feedback ?? "");
+    if (feedback === null) {
+      return;
+    }
+
+    try {
+      await updateTask(task.id, {
+        reviewDecision: "Rejected",
+        reviewFeedback: feedback,
+      });
+      toast.success("Task rejected");
+    } catch (error) {
+      showApiError(error, "Failed to reject task");
+    }
+  }
+
+  function openCreateModal() {
+    setEditingTask(null);
+    setModalOpen(true);
+  }
+
+  function openEditModal(task) {
+    setEditingTask(task);
+    setModalOpen(true);
+  }
+
+  return (
+    <div className="space-y-4">
+      <motion.section
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+        className={
+          user?.role === "admin"
+            ? "overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-[0_24px_80px_rgba(2,6,23,0.50)] backdrop-blur-2xl"
+            : "task-panel overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(248,250,252,0.88))]"
+        }
+      >
+        <div className="grid gap-6 p-6 sm:p-8 lg:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <p className={user?.role === "admin" ? "text-xs uppercase tracking-[0.28em] text-slate-400" : "text-xs uppercase tracking-[0.28em] text-slate-400"}>
+              Task workspace
+            </p>
+            <h1 className={user?.role === "admin" ? "mt-4 font-display text-4xl font-semibold text-white" : "mt-4 font-display text-4xl font-semibold text-slate-950"}>
+              {user?.role === "admin" ? "Manage assignments with clarity" : "Track your assigned work"}
+            </h1>
+            <p className={user?.role === "admin" ? "mt-4 max-w-2xl text-sm leading-7 text-slate-300" : "mt-4 max-w-2xl text-sm leading-7 text-slate-600"}>
+              {user?.role === "admin"
+                ? "Review the task table, approve submissions, and manage updates in one premium workspace."
+                : "Search tasks, upload submissions, and follow the approval feedback from admins."}
+            </p>
+          </div>
+
+          <div className="flex items-start justify-end">
+            {user?.role === "admin" ? (
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="rounded-2xl bg-gradient-to-r from-[#4F46E5] via-[#06B6D4] to-[#A855F7] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5"
+              >
+                + Create Task
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 22 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.32, delay: 0.06, ease: "easeOut" }}
+        className={user?.role === "admin" ? "rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-2xl" : "task-panel p-6"}
+      >
+        <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search by task title, description, assignee, or status"
+            className={
+              user?.role === "admin"
+                ? "h-14 rounded-2xl border border-white/12 bg-white/6 px-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-300"
+                : "task-select"
+            }
+          />
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className={
+              user?.role === "admin"
+                ? "h-14 rounded-2xl border border-white/12 bg-white/6 px-4 text-sm text-white outline-none focus:border-cyan-300"
+                : "task-select"
+            }
+          >
+            <option value="All" className="text-slate-900">All statuses</option>
+            {taskStatuses.map((status) => (
+              <option key={status} value={status} className="text-slate-900">
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+      </motion.section>
+
+      {loading ? (
+        <section className={user?.role === "admin" ? "flex min-h-[40vh] items-center justify-center rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-2xl" : "task-panel flex min-h-[40vh] items-center justify-center p-6"}>
+          <div className={user?.role === "admin" ? "h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-cyan-300" : "h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-slate-900"} />
+        </section>
+      ) : filteredTasks.length ? (
+        user?.role === "admin" ? (
+          <TaskTable
+            tasks={filteredTasks}
+            onEdit={openEditModal}
+            onDelete={handleDelete}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            theme="dark"
+          />
+        ) : (
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredTasks.map((task) => (
+              <TaskCard key={task.id} task={task} />
+            ))}
+          </section>
+        )
+      ) : (
+        <section className={user?.role === "admin" ? "flex min-h-[40vh] items-center justify-center rounded-[28px] border border-white/10 bg-white/5 p-6 text-center backdrop-blur-2xl sm:p-8" : "glass-panel flex min-h-[40vh] items-center justify-center p-6 text-center sm:p-8"}>
+          <div className="max-w-lg">
+            <p className={user?.role === "admin" ? "text-xs uppercase tracking-[0.28em] text-slate-400" : "text-xs uppercase tracking-[0.28em] text-slate-400"}>No matches</p>
+            <h2 className={user?.role === "admin" ? "mt-4 font-display text-3xl font-semibold text-white" : "mt-4 font-display text-3xl font-semibold text-slate-950"}>
+              No tasks fit this view
+            </h2>
+            <p className={user?.role === "admin" ? "mt-4 text-sm leading-7 text-slate-300" : "mt-4 text-sm leading-7 text-slate-600"}>
+              Try a different search or status filter{user?.role === "admin" ? ", or create a fresh assignment for your team." : "."}
+            </p>
+            {user?.role === "admin" ? (
+              <button type="button" onClick={openCreateModal} className="mt-6 rounded-2xl bg-gradient-to-r from-[#4F46E5] via-[#06B6D4] to-[#A855F7] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5">
+                + Create Task
+              </button>
+            ) : null}
+          </div>
+        </section>
+      )}
+
+      {user?.role === "admin" ? (
+        <TaskModal
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setEditingTask(null);
+          }}
+          onSubmit={editingTask ? handleUpdate : handleCreate}
+          initialValues={editingTask}
+          mode={editingTask ? "edit" : "create"}
+        />
+      ) : null}
+    </div>
+  );
+}

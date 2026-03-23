@@ -1,0 +1,154 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #f1f5f9 100%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+.bg-app {
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.08), transparent 50%),
+    radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.06), transparent 50%),
+    linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.glass-panel,
+.task-panel,
+.task-card {
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 24px;
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 10px 10px -5px rgb(0 0 0 / 0.03);
+}
+
+.task-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 40px -8px rgb(0 0 0 / 0.12);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 18px;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(90deg, #6366f1 0%, #818cf8 45%, #06b6d4 100%);
+  box-shadow: 0 16px 35px rgba(99, 102, 241, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary,
+.task-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-secondary:hover,
+.task-secondary-button:hover {
+  transform: translateY(-2px);
+  border-color: #a5b4fc;
+}
+
+.task-field,
+.task-select,
+.task-textarea {
+  width: 100%;
+  border: 1px solid #dbe3ef;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.task-field,
+.task-select {
+  height: 56px;
+  padding: 0 1rem;
+}
+
+.task-textarea {
+  min-height: 160px;
+  padding: 1rem;
+  resize: vertical;
+}
+
+.task-field:focus,
+.task-select:focus,
+.task-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+
+.task-floating-label {
+  position: absolute;
+  left: 1rem;
+  top: 0.9rem;
+  font-size: 0.875rem;
+  color: #64748b;
+  pointer-events: none;
+}
+
+@keyframes loaderPulse {
+  0%, 100% { transform: scale(1); opacity: 0.82; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+@keyframes loaderProgress {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(230%); }
+}
+
+.loader-fade-in { animation: loaderPulse 0.7s ease-out both; }
+.loader-logo-pulse { animation: loaderPulse 2.4s ease-in-out infinite; }
+.loader-progress { animation: loaderProgress 2.1s linear infinite; }

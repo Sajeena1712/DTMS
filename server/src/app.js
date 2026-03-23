@@ -71,6 +71,10 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get("/health", (req, res) => {
+  res.status(200).json({ message: "DTMS Backend is running successfully" });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api", authRoutes); // keeps legacy /api/login working
 app.use("/api/tasks", taskRoutes);

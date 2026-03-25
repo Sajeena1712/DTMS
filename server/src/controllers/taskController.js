@@ -16,6 +16,24 @@ function sanitizeFileName(fileName) {
     .trim();
 }
 
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function parseEmailList(value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value || "")
+        .split(/[\n,;]+/)
+        .map((item) => item.trim());
+
+  return [...new Set(values.map(normalizeEmail).filter(Boolean))];
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 function resolveStoredUploadPath(fileUrl) {
   if (typeof fileUrl !== "string" || !fileUrl.startsWith("/uploads/")) {
     return null;
@@ -79,6 +97,98 @@ function getLateSubmissionReason(reminders) {
   }
 
   return typeof reminders.lateSubmissionReason === "string" ? reminders.lateSubmissionReason.trim() : "";
+}
+
+async function loadBulkTaskRecipients({ assignedUserId, assignedEmails, assignToAllUsers }) {
+  if (assignToAllUsers) {
+    return prisma.user.findMany({
+      where: { role: "USER" },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  const parsedEmails = parseEmailList(assignedEmails);
+  if (parsedEmails.length > 0) {
+    const invalidEmails = parsedEmails.filter((email) => !isValidEmail(email));
+    if (invalidEmails.length > 0) {
+      const error = new Error(`Invalid email address: ${invalidEmails[0]}`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        role: "USER",
+        email: { in: parsedEmails },
+      },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const usersByEmail = new Map(users.map((user) => [normalizeEmail(user.email), user]));
+    const missingEmails = parsedEmails.filter((email) => !usersByEmail.has(email));
+
+    if (missingEmails.length > 0) {
+      const error = new Error(`No registered user found for: ${missingEmails.slice(0, 5).join(", ")}`);
+      error.statusCode = 404;
+      error.missingEmails = missingEmails;
+      throw error;
+    }
+
+    return parsedEmails.map((email) => usersByEmail.get(email)).filter(Boolean);
+  }
+
+  if (assignedUserId) {
+    const user = await prisma.user.findUnique({
+      where: { id: assignedUserId },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    return user ? [user] : [];
+  }
+
+  return [];
+}
+
+async function sendTaskAssignmentEmail(task) {
+  if (!task?.user?.email) {
+    return;
+  }
+
+  const assignmentEmail = buildAssignedTaskEmail({
+    taskTitle: task.title,
+    description: task.description || "",
+    status: task.status,
+    deadline: task.deadline,
+    assigneeName: task.user.name,
+  });
+
+  await sendEmail({
+    to: task.user.email,
+    subject: assignmentEmail.subject,
+    text: assignmentEmail.text,
+    html: assignmentEmail.html,
+  });
+}
+
+async function dispatchAssignmentEmails(tasks) {
+  const batchSize = 25;
+
+  for (let index = 0; index < tasks.length; index += batchSize) {
+    const batch = tasks.slice(index, index + batchSize);
+    await Promise.allSettled(batch.map((task) => sendTaskAssignmentEmail(task)));
+  }
+}
+
+function chunkArray(items, size) {
+  const chunks = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 function buildLateSubmissionReminder(reminders, lateSubmissionReason, allowedBy) {
@@ -271,63 +381,97 @@ export async function getTasks(req, res, next) {
 
 export async function createTask(req, res, next) {
   try {
-    const { title, description, deadline, lateSubmissionReason, assignedUser, assignedUserId, assignedTo, status } = req.body;
+    const {
+      title,
+      description,
+      deadline,
+      lateSubmissionReason,
+      assignedUser,
+      assignedUserId,
+      assignedTo,
+      assignedEmails,
+      assignToAllUsers,
+      status,
+    } = req.body;
 
     if (!title?.trim()) {
       return res.status(400).json({ message: "Title is required" });
     }
 
     const targetUserId = assignedUserId || assignedUser || assignedTo;
-    if (!targetUserId) {
-      return res.status(400).json({ message: "A valid assigned user is required" });
-    }
-
-    const userCount = await prisma.user.count({ where: { id: targetUserId } });
-    if (userCount === 0) {
-      return res.status(404).json({ message: "Assigned user not found" });
-    }
-
-    const task = await prisma.task.create({
-      data: {
-        title: title.trim(),
-        description: description?.trim(),
-        deadline: deadline ? new Date(deadline) : undefined,
-        status: status || "PENDING",
-        userId: targetUserId,
-        reminders: buildLateSubmissionReminder(undefined, lateSubmissionReason, req.user.id),
-      },
+    const targetUsers = await loadBulkTaskRecipients({
+      assignedUserId: targetUserId,
+      assignedEmails,
+      assignToAllUsers,
     });
 
-    const populated = await prisma.task.findUnique({
-      where: { id: task.id },
-      include: {
-        user: { select: { id: true, name: true, email: true, role: true } },
-      },
-    });
+    if (targetUsers.length === 0) {
+      return res.status(400).json({
+        message: "A valid assigned user, email list, or bulk target is required",
+      });
+    }
 
-    if (populated?.user?.email) {
+    const baseData = {
+      title: title.trim(),
+      description: description?.trim(),
+      deadline: deadline ? new Date(deadline) : undefined,
+      status: status || "PENDING",
+      reminders: buildLateSubmissionReminder(undefined, lateSubmissionReason, req.user.id),
+    };
+
+    const createdTasks = [];
+    const taskCreationBatches = chunkArray(targetUsers, 20);
+
+    for (const batch of taskCreationBatches) {
+      const createdBatch = await Promise.all(
+        batch.map(async (user) => {
+          const task = await prisma.task.create({
+            data: {
+              ...baseData,
+              userId: user.id,
+            },
+          });
+
+          return serializeTask({
+            ...task,
+            user,
+          });
+        }),
+      );
+
+      createdTasks.push(...createdBatch);
+    }
+
+    if (createdTasks.length === 1) {
       try {
-        const assignmentEmail = buildAssignedTaskEmail({
-          taskTitle: populated.title,
-          description: populated.description || "",
-          status: populated.status,
-          deadline: populated.deadline,
-          assigneeName: populated.user.name,
-        });
-
-        await sendEmail({
-          to: populated.user.email,
-          subject: assignmentEmail.subject,
-          text: assignmentEmail.text,
-          html: assignmentEmail.html,
+        await sendTaskAssignmentEmail({
+          ...createdTasks[0],
+          user: targetUsers[0],
         });
       } catch (emailError) {
         console.error("Task assignment email failed", emailError);
       }
+
+      return res.status(201).json({
+        task: createdTasks[0],
+      });
     }
 
+    setImmediate(() => {
+      dispatchAssignmentEmails(
+        createdTasks.map((task, index) => ({
+          ...task,
+          user: targetUsers[index],
+        })),
+      ).catch((emailError) => {
+        console.error("Bulk task assignment email failed", emailError);
+      });
+    });
+
     return res.status(201).json({
-      task: serializeTask(populated),
+      message: `Task assigned to ${createdTasks.length} students`,
+      tasks: createdTasks,
+      count: createdTasks.length,
     });
   } catch (error) {
     next(error);

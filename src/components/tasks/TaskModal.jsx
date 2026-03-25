@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import api, { safeRequest } from "../../api/client";
 import { displayTaskStatus, normalizeTaskStatus, statusTone, taskStatuses, taskVisuals } from "../../lib/constants";
+import { parseEmailList } from "./taskAssignment";
 
 const defaultForm = {
   title: "",
   description: "",
   assignedUserId: "",
+  assignmentMode: "single",
+  assigneeEmails: "",
   status: "PENDING",
   deadline: "",
   lateSubmissionReason: "",
@@ -30,6 +33,8 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
           initialValues.assignedTo ??
           initialValues.assignedUser?.id ??
           "",
+        assignmentMode: "single",
+        assigneeEmails: "",
         status: normalizeTaskStatus(initialValues.status ?? "PENDING"),
         deadline: initialValues.deadline
           ? new Date(initialValues.deadline).toISOString().slice(0, 10)
@@ -76,6 +81,8 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
     return null;
   }
 
+  const parsedEmails = parseEmailList(form.assigneeEmails);
+
   function updateField(event) {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
@@ -97,15 +104,28 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
     setSaving(true);
 
     try {
-      await onSubmit({
+      const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
-        assignedUserId: form.assignedUserId,
         status: form.status,
         deadline: form.deadline || undefined,
         lateSubmissionReason: form.lateSubmissionReason.trim() || undefined,
         image: form.image,
-      });
+      };
+
+      if (mode === "create") {
+        if (form.assignmentMode === "emails") {
+          payload.assignedEmails = parsedEmails;
+        } else if (form.assignmentMode === "all") {
+          payload.assignToAllUsers = true;
+        } else {
+          payload.assignedUserId = form.assignedUserId;
+        }
+      } else {
+        payload.assignedUserId = form.assignedUserId;
+      }
+
+      await onSubmit(payload);
       onClose();
     } finally {
       setSaving(false);
@@ -174,38 +194,134 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
 
           <div className="rounded-2xl border border-white/15 bg-white/8 p-4 backdrop-blur">
             <p className="text-xs uppercase tracking-[0.28em] text-white/65">Assignment</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Assign user</span>
-                <select
-                  name="assignedUserId"
-                  value={form.assignedUserId}
-                  onChange={updateField}
-                  className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
-                  required
-                >
-                  <option value="" className="text-slate-900">
-                    {loadingUsers ? "Loading users..." : "Select user"}
-                  </option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id} className="text-slate-900">
-                      {user.name || user.email}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            {mode === "create" ? (
+              <>
+                <label className="mt-4 grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Assignment mode</span>
+                  <select
+                    name="assignmentMode"
+                    value={form.assignmentMode}
+                    onChange={updateField}
+                    className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                  >
+                    <option value="single" className="text-slate-900">Single user</option>
+                    <option value="emails" className="text-slate-900">Multiple registered emails</option>
+                    <option value="all" className="text-slate-900">All registered users</option>
+                  </select>
+                </label>
 
-              <label className="grid gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Deadline</span>
-                <input
-                  name="deadline"
-                  type="date"
-                  value={form.deadline}
-                  onChange={updateField}
-                  className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
-                />
-              </label>
-            </div>
+                {form.assignmentMode === "single" ? (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Assign user</span>
+                      <select
+                        name="assignedUserId"
+                        value={form.assignedUserId}
+                        onChange={updateField}
+                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                        required
+                      >
+                        <option value="" className="text-slate-900">
+                          {loadingUsers ? "Loading users..." : "Select user"}
+                        </option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id} className="text-slate-900">
+                            {user.name || user.email}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Deadline</span>
+                      <input
+                        name="deadline"
+                        type="date"
+                        value={form.deadline}
+                        onChange={updateField}
+                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                      />
+                    </label>
+                  </div>
+                ) : form.assignmentMode === "emails" ? (
+                  <>
+                    <label className="mt-4 grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">
+                        Registered emails
+                      </span>
+                      <textarea
+                        name="assigneeEmails"
+                        value={form.assigneeEmails}
+                        onChange={updateField}
+                        placeholder="Paste email addresses separated by commas, spaces, or new lines"
+                        className="min-h-24 rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none placeholder:text-white/45 transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                        required
+                      />
+                    </label>
+
+                    <label className="mt-4 grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Deadline</span>
+                      <input
+                        name="deadline"
+                        type="date"
+                        value={form.deadline}
+                        onChange={updateField}
+                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <div className="mt-4 rounded-2xl border border-cyan-200/30 bg-cyan-400/10 p-4 text-sm text-white/80">
+                      This will create one task record for each registered student.
+                    </div>
+                    <label className="mt-4 grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Deadline</span>
+                      <input
+                        name="deadline"
+                        type="date"
+                        value={form.deadline}
+                        onChange={updateField}
+                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                      />
+                    </label>
+                  </>
+                )}
+              </>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Assign user</span>
+                  <select
+                    name="assignedUserId"
+                    value={form.assignedUserId}
+                    onChange={updateField}
+                    className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                    required
+                  >
+                    <option value="" className="text-slate-900">
+                      {loadingUsers ? "Loading users..." : "Select user"}
+                    </option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id} className="text-slate-900">
+                        {user.name || user.email}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Deadline</span>
+                  <input
+                    name="deadline"
+                    type="date"
+                    value={form.deadline}
+                    onChange={updateField}
+                    className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                  />
+                </label>
+              </div>
+            )}
 
             <label className="mt-4 grid gap-2">
               <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">

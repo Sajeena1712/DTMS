@@ -83,10 +83,12 @@ export function TaskProvider({ children }) {
       () => api.post("/tasks", payload),
       "Failed to create task",
     );
-    const nextTask = decorateTasks([data.task])[0];
-    setTasks((current) => [nextTask, ...current]);
+    if (data.task) {
+      const nextTask = decorateTasks([data.task])[0];
+      setTasks((current) => [nextTask, ...current]);
+    }
     await refetch();
-    return nextTask;
+    return data;
   };
 
   const updateTask = async (taskId, payload) => {

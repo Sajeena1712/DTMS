@@ -48,8 +48,12 @@ export default function TaskListPage() {
 
   async function handleCreate(values) {
     try {
-      await createTask(values);
-      toast.success("Task created");
+      const result = await createTask(values);
+      toast.success(
+        result?.count && result.count > 1
+          ? `Task assigned to ${result.count} students`
+          : "Task created",
+      );
       setModalOpen(false);
       setEditingTask(null);
     } catch (error) {

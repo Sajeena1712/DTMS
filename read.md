@@ -30,6 +30,8 @@ npm install
 npm run start
 ```
 
+The backend dev server runs on `http://localhost:3001` if `3000` is already occupied.
+
 3. Run the server separately if needed:
 
 ```bash

@@ -10,8 +10,12 @@ export default function TaskCreatePage() {
 
   async function handleCreate(values) {
     try {
-      await createTask(values);
-      toast.success("Task created");
+      const result = await createTask(values);
+      toast.success(
+        result?.count && result.count > 1
+          ? `Task assigned to ${result.count} students`
+          : "Task created",
+      );
       navigate("/tasks");
     } catch (error) {
       showApiError(error, "Failed to create task");

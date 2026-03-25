@@ -119,7 +119,7 @@ export default function Login() {
     setResendLoading(true);
     try {
       const response = await resendVerificationEmail(email);
-      setServerMessage(response.message || "A verification email has been sent.");
+      setServerMessage(response.message || `A verification email has been sent to ${email}.`);
     } catch (error) {
       setServerMessage(error.message || "Unable to resend verification email");
     } finally {

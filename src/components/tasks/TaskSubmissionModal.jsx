@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import JSZip from "jszip";
 import { motion } from "framer-motion";
 import { resolveApiUrl } from "../../api/client";
 import {
@@ -31,6 +33,72 @@ function getAttachmentKind(fileName = "", fileUrl = "") {
 }
 
 export default function TaskSubmissionModal({ open, onClose, task }) {
+  const [zipEntries, setZipEntries] = useState([]);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipError, setZipError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadZipPreview() {
+      if (!open || !task) {
+        return;
+      }
+
+      const submissionLink = task.submission?.fileUrl;
+      const normalizedSubmissionLink = typeof submissionLink === "string" ? submissionLink.trim() : "";
+      const resolvedSubmissionLink = resolveApiUrl(normalizedSubmissionLink);
+      const hasOpenableLink = /^(https?:\/\/|\/)/i.test(normalizedSubmissionLink);
+      const attachmentKind = getAttachmentKind(task.submission?.fileName, normalizedSubmissionLink);
+
+      if (!hasOpenableLink || attachmentKind !== "zip") {
+        setZipEntries([]);
+        setZipLoading(false);
+        setZipError("");
+        return;
+      }
+
+      setZipLoading(true);
+      setZipError("");
+      setZipEntries([]);
+
+      try {
+        const response = await fetch(resolvedSubmissionLink, { credentials: "include" });
+        if (!response.ok) {
+          throw new Error(`Unable to load ZIP file (${response.status})`);
+        }
+
+        const buffer = await response.arrayBuffer();
+        const zip = await JSZip.loadAsync(buffer);
+        const entries = Object.values(zip.files)
+          .filter((file) => !file.dir)
+          .map((file) => ({
+            name: file.name,
+            size: file._data?.uncompressedSize || file._data?.compressedSize || null,
+          }));
+
+        if (active) {
+          setZipEntries(entries);
+        }
+      } catch (error) {
+        if (active) {
+          setZipError(error?.message || "Unable to preview this ZIP file");
+          setZipEntries([]);
+        }
+      } finally {
+        if (active) {
+          setZipLoading(false);
+        }
+      }
+    }
+
+    loadZipPreview();
+
+    return () => {
+      active = false;
+    };
+  }, [open, task]);
+
   if (!open || !task) {
     return null;
   }
@@ -197,6 +265,65 @@ export default function TaskSubmissionModal({ open, onClose, task }) {
             ) : null}
           </div>
         </section>
+
+        {hasOpenableLink && isZipLink ? (
+          <section className="mt-6 rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(148,163,184,0.12)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">ZIP preview</p>
+                <p className="mt-2 text-sm text-slate-600">
+                  We read the archive in the browser and list the files inside it.
+                </p>
+              </div>
+              <a
+                href={resolvedSubmissionLink}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Download ZIP
+              </a>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+              {zipLoading ? (
+                <p className="text-sm text-slate-600">Loading ZIP contents...</p>
+              ) : zipError ? (
+                <p className="text-sm leading-7 text-rose-600">{zipError}</p>
+              ) : zipEntries.length ? (
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">
+                    {zipEntries.length} file{zipEntries.length === 1 ? "" : "s"} found in archive
+                  </p>
+                  <ul className="mt-4 space-y-2">
+                    {zipEntries.slice(0, 10).map((entry) => (
+                      <li
+                        key={entry.name}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-white bg-white px-4 py-3"
+                      >
+                        <span className="truncate text-sm font-medium text-slate-700">{entry.name}</span>
+                        {entry.size ? (
+                          <span className="shrink-0 text-xs text-slate-400">
+                            {Math.max(1, Math.round(entry.size / 1024))} KB
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {zipEntries.length > 10 ? (
+                    <p className="mt-3 text-xs text-slate-500">
+                      Showing the first 10 files only.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm leading-7 text-slate-600">
+                  The archive is ready to download. If the ZIP contains files, they will appear here after loading.
+                </p>
+              )}
+            </div>
+          </section>
+        ) : null}
 
         {canPreviewInline && isPdfLink ? (
           <section className="mt-6 rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(148,163,184,0.12)]">

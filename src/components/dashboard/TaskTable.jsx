@@ -79,7 +79,7 @@ export default function TaskTable({
                         className={cn(
                           "rounded-2xl px-4 py-2 text-xs font-semibold transition hover:-translate-y-0.5",
                           theme === "dark"
-                            ? "border border-sky-400/30 bg-sky-400/10 text-sky-100 hover:bg-sky-400/20"
+                            ? "border border-sky-400/30 bg-sky-100 text-slate-950 hover:bg-sky-200"
                             : "border border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100",
                         )}
                       >

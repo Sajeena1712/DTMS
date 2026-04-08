@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "dev": "node scripts/ensureLocalMongo.js && node src/server.js",
     "start": "node scripts/ensureLocalMongo.js && node src/server.js",
     "seed": "node src/seed/adminSeed.js",

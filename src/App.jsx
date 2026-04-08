@@ -16,6 +16,7 @@ const VerifyEmailPage = lazy(() => import("./pages/auth/VerifyEmailPage"));
 const AdminDashboardPage = lazy(() => import("./pages/dashboard/AdminDashboardPage"));
 const AnalyticsPage = lazy(() => import("./pages/dashboard/AnalyticsPage"));
 const CalendarPage = lazy(() => import("./pages/dashboard/CalendarPage"));
+const LeaderboardPage = lazy(() => import("./pages/dashboard/LeaderboardPage"));
 const SettingsPage = lazy(() => import("./pages/dashboard/SettingsPage"));
 const TeamPage = lazy(() => import("./pages/dashboard/TeamPage"));
 const UserDashboardPage = lazy(() => import("./pages/dashboard/UserDashboardPage"));
@@ -148,7 +149,8 @@ function AppRoutes() {
                 <Route path="/admin-dashboard" element={<RoleRoute allowedRole="admin"><AdminDashboardPage /></RoleRoute>} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/team" element={<TeamPage />} />
+                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/team" element={<RoleRoute allowedRole="admin"><TeamPage /></RoleRoute>} />
                 <Route path="/users" element={<RoleRoute allowedRole="admin"><UsersPage /></RoleRoute>} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/user-dashboard" element={<RoleRoute allowedRole="user"><UserDashboardPage /></RoleRoute>} />

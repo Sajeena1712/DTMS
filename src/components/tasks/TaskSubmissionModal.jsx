@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import JSZip from "jszip";
 import { motion } from "framer-motion";
 import { resolveApiUrl } from "../../api/client";
+import TaskDiscussionPanel from "./TaskDiscussionPanel";
 import {
   displayPriority,
   displayTaskStatus,
@@ -16,7 +17,7 @@ function DetailCard({ label, value }) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3">
       <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-950">{value || "--"}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-950">{value ?? "--"}</p>
     </div>
   );
 }
@@ -393,11 +394,14 @@ export default function TaskSubmissionModal({ open, onClose, task }) {
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
+              <DetailCard label="Score" value={task.review?.score ?? "--"} />
               <DetailCard label="Reviewed on" value={reviewedAt} />
               <DetailCard label="Reviewed by" value={task.review?.reviewedBy || "--"} />
             </div>
           </div>
         </section>
+
+        <TaskDiscussionPanel taskId={task.id} taskTitle={task.title} compact />
       </motion.aside>
     </div>
   );

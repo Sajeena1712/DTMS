@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { motion } from 'framer-motion';
 import { fetchTasks, fetchDashboardStats } from '../../api/taskApi';
+import { fetchAdminSummary } from '../../api/adminApi';
 import { cn } from '../../lib/utils';
 
 const COLORS = ['#4F46E5', '#8B5CF6', '#06B6D4', '#10B981', '#F97316'];
 
 export default function AnalyticsPage() {
   const [data, setData] = useState({ tasks: [], stats: {} });
+  const [summary, setSummary] = useState({ stats: {}, teamPerformance: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,6 +20,8 @@ export default function AnalyticsPage() {
           fetchDashboardStats()
         ]);
         setData({ tasks: tasksRes.tasks || [], stats: statsRes.stats || {} });
+        const adminSummary = await fetchAdminSummary();
+        setSummary(adminSummary);
       } catch (error) {
         console.error('Failed to load analytics:', error);
       } finally {
@@ -130,6 +134,48 @@ export default function AnalyticsPage() {
         <div className="task-panel p-6 text-center">
           <p className="text-4xl font-semibold text-amber-600">{data.stats.pendingTasks || 0}</p>
           <p className="mt-2 text-sm text-slate-500 uppercase tracking-wide">Pending review</p>
+        </div>
+      </motion.section>
+
+      <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid gap-6 md:grid-cols-4">
+        <div className="task-panel p-6 text-center">
+          <p className="text-4xl font-semibold text-slate-950">{summary.stats?.totalTeams || 0}</p>
+          <p className="mt-2 text-sm text-slate-500 uppercase tracking-wide">Total teams</p>
+        </div>
+        <div className="task-panel p-6 text-center">
+          <p className="text-4xl font-semibold text-sky-600">{summary.stats?.totalUsers || 0}</p>
+          <p className="mt-2 text-sm text-slate-500 uppercase tracking-wide">Total users</p>
+        </div>
+        <div className="task-panel p-6 text-center">
+          <p className="text-4xl font-semibold text-emerald-600">{summary.stats?.tasksCompleted || 0}</p>
+          <p className="mt-2 text-sm text-slate-500 uppercase tracking-wide">Tasks completed</p>
+        </div>
+        <div className="task-panel p-6 text-center">
+          <p className="text-4xl font-semibold text-rose-600">{summary.stats?.tasksPending || 0}</p>
+          <p className="mt-2 text-sm text-slate-500 uppercase tracking-wide">Tasks pending</p>
+        </div>
+      </motion.section>
+
+      <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="task-panel p-6">
+        <h2 className="text-2xl font-semibold text-slate-950 mb-6">Team performance</h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {(summary.teamPerformance || []).map((team) => (
+            <div key={team.id} className="rounded-2xl border border-slate-200/80 bg-white p-5">
+              <p className="text-lg font-semibold text-slate-950">{team.name}</p>
+              <p className="mt-1 text-sm text-slate-500">{team.memberCount} members</p>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(8, team.completedTasks || 0 ? Math.min(100, Math.round((team.completedTasks / Math.max(1, team.totalTasks)) * 100)) : 0)}%` }} />
+              </div>
+              <p className="mt-3 text-sm text-slate-600">
+                {team.completedTasks} completed / {team.totalTasks} assigned
+              </p>
+            </div>
+          ))}
+          {!summary.teamPerformance?.length ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+              No team performance data yet.
+            </div>
+          ) : null}
         </div>
       </motion.section>
     </div>

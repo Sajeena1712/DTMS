@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { showApiError } from "../../api/client";
 import { displayTaskStatus, normalizeTaskStatus, statusTone, taskStatuses } from "../../lib/constants";
+import TaskDiscussionPanel from "./TaskDiscussionPanel";
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -117,6 +118,8 @@ export default function TaskProgressModal({ open, task, onClose, onSubmit }) {
             User update only
           </span>
         </div>
+
+        <TaskDiscussionPanel taskId={task.id} taskTitle={task.title} compact />
 
         <form className="mt-8 grid gap-5" onSubmit={handleSubmit}>
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">

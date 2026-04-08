@@ -12,7 +12,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
 import MetricCard from "../../components/dashboard/MetricCard";
+import DiscussionNotifications from "../../components/dashboard/DiscussionNotifications";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTasks } from "../../contexts/TaskContext";
 import { displayTaskStatus, normalizeTaskStatus } from "../../lib/constants";
@@ -48,6 +50,7 @@ function getDueSoonTasks(tasks) {
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const { tasks } = useTasks();
+  const navigate = useNavigate();
 
   const stats = useMemo(() => {
     const totalTasks = tasks.length;
@@ -108,6 +111,15 @@ export default function AdminDashboardPage() {
         <MetricCard label="Ongoing" value={stats.ongoingTasks} detail="Work currently in progress." accent="cyan" />
         <MetricCard label="Pending" value={stats.pendingTasks} detail="Waiting for action or review." accent="rose" />
       </section>
+
+      <DiscussionNotifications
+        tasks={tasks}
+        title="Discussion alerts"
+        description="Unreads from task threads are shown here so the admin can jump into the latest feedback and replies."
+        emptyTitle="No open discussion alerts"
+        emptyDescription="There are no unread task comments at the moment."
+        onOpenTask={(task) => navigate(`/tasks?task=${task.id}`)}
+      />
 
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <article className="task-panel p-6">

@@ -17,6 +17,7 @@ export const authVisualStats = [
 
 export const adminNavLinks = [
   { href: "/admin-dashboard", label: "Dashboard" },
+  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/tasks", label: "Tasks" },
   { href: "/calendar", label: "Calendar" },
   { href: "/analytics", label: "Analytics" },
@@ -26,10 +27,10 @@ export const adminNavLinks = [
 
 export const userNavLinks = [
   { href: "/user-dashboard", label: "Dashboard" },
+  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/tasks", label: "Tasks" },
   { href: "/calendar", label: "Calendar" },
   { href: "/analytics", label: "Analytics" },
-  { href: "/team", label: "Team" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -57,7 +58,7 @@ export function isAdminRole(role) {
 }
 
 export function isUserRole(role) {
-  return normalizeRole(role) === "USER";
+  return ["USER", "TEAM_LEADER"].includes(normalizeRole(role));
 }
 
 export function normalizeTaskStatus(status) {

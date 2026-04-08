@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import api, { safeRequest } from "../../api/client";
+import { fetchTeams } from "../../api/adminApi";
 import { displayTaskStatus, normalizeTaskStatus, statusTone, taskStatuses, taskVisuals } from "../../lib/constants";
 import { parseEmailList } from "./taskAssignment";
 
@@ -8,19 +9,27 @@ const defaultForm = {
   title: "",
   description: "",
   assignedUserId: "",
+  assignedTeamId: "",
   assignmentMode: "single",
   assigneeEmails: "",
   status: "PENDING",
   deadline: "",
   lateSubmissionReason: "",
+  reviewDecision: "",
+  reviewFeedback: "",
   image: taskVisuals[0],
 };
 
 export default function TaskModal({ open, onClose, onSubmit, initialValues, mode = "create" }) {
   const [form, setForm] = useState(defaultForm);
   const [users, setUsers] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const selectedUser = users.find((user) => user.id === form.assignedUserId);
+  const selectedUserTeamName = selectedUser?.teamName || selectedUser?.team?.name || "No team assigned";
+  const selectedTeam = teams.find((team) => team.id === form.assignedTeamId);
 
   useEffect(() => {
     if (initialValues) {
@@ -33,6 +42,7 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
           initialValues.assignedTo ??
           initialValues.assignedUser?.id ??
           "",
+        assignedTeamId: initialValues.teamId ?? initialValues.assignedTeamId ?? "",
         assignmentMode: "single",
         assigneeEmails: "",
         status: normalizeTaskStatus(initialValues.status ?? "PENDING"),
@@ -40,6 +50,8 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
           ? new Date(initialValues.deadline).toISOString().slice(0, 10)
           : "",
         lateSubmissionReason: initialValues.reminders?.lateSubmissionReason ?? initialValues.lateSubmissionReason ?? "",
+        reviewDecision: initialValues.review?.decision ?? "",
+        reviewFeedback: initialValues.review?.feedback ?? "",
         image: initialValues.image ?? defaultForm.image,
       });
     } else {
@@ -70,6 +82,36 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
 
     if (open) {
       loadUsers();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTeams() {
+      setLoadingTeams(true);
+      try {
+        const { teams: teamList } = await fetchTeams();
+        if (active) {
+          setTeams(teamList ?? []);
+        }
+      } catch {
+        if (active) {
+          setTeams([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingTeams(false);
+        }
+      }
+    }
+
+    if (open) {
+      loadTeams();
     }
 
     return () => {
@@ -116,6 +158,8 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
       if (mode === "create") {
         if (form.assignmentMode === "emails") {
           payload.assignedEmails = parsedEmails;
+        } else if (form.assignmentMode === "team") {
+          payload.assignedTeamId = form.assignedTeamId;
         } else if (form.assignmentMode === "all") {
           payload.assignToAllUsers = true;
         } else {
@@ -123,6 +167,10 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
         }
       } else {
         payload.assignedUserId = form.assignedUserId;
+        if (form.reviewDecision === "Approved" || form.reviewDecision === "Rejected") {
+          payload.reviewDecision = form.reviewDecision;
+          payload.reviewFeedback = form.reviewFeedback.trim();
+        }
       }
 
       await onSubmit(payload);
@@ -205,6 +253,7 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
                     className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
                   >
                     <option value="single" className="text-slate-900">Single user</option>
+                    <option value="team" className="text-slate-900">Whole team</option>
                     <option value="emails" className="text-slate-900">Multiple registered emails</option>
                     <option value="all" className="text-slate-900">All registered users</option>
                   </select>
@@ -227,6 +276,39 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
                         {users.map((user) => (
                           <option key={user.id} value={user.id} className="text-slate-900">
                             {user.name || user.email}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Deadline</span>
+                      <input
+                        name="deadline"
+                        type="date"
+                        value={form.deadline}
+                        onChange={updateField}
+                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                      />
+                    </label>
+                  </div>
+                ) : form.assignmentMode === "team" ? (
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="grid gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.24em] text-white/60">Team</span>
+                      <select
+                        name="assignedTeamId"
+                        value={form.assignedTeamId}
+                        onChange={updateField}
+                        className="h-11 rounded-xl border border-white/15 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-sky-300 focus:shadow-[0_0_0_4px_rgba(125,211,252,0.18)]"
+                        required
+                      >
+                        <option value="" className="text-slate-900">
+                          {loadingTeams ? "Loading teams..." : "Select team"}
+                        </option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id} className="text-slate-900">
+                            {team.name}
                           </option>
                         ))}
                       </select>
@@ -387,6 +469,51 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
             </label>
           </div>
 
+          {mode === "edit" ? (
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.28em] text-emerald-200">Review decision</p>
+              <p className="mt-3 text-sm leading-7 text-emerald-50/90">
+                Choose an approval decision before saving if this edit is part of the submission review flow.
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/70">
+                    Decision
+                  </span>
+                  <select
+                    name="reviewDecision"
+                    value={form.reviewDecision}
+                    onChange={updateField}
+                    className="h-11 rounded-xl border border-emerald-200/20 bg-white/10 px-3 text-sm text-white outline-none transition focus:border-emerald-200 focus:shadow-[0_0_0_4px_rgba(167,243,208,0.18)]"
+                  >
+                    <option value="" className="text-slate-900">
+                      Leave unchanged
+                    </option>
+                    <option value="Approved" className="text-slate-900">
+                      Approved
+                    </option>
+                    <option value="Rejected" className="text-slate-900">
+                      Rejected
+                    </option>
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/70">
+                    Feedback
+                  </span>
+                  <textarea
+                    name="reviewFeedback"
+                    value={form.reviewFeedback}
+                    onChange={updateField}
+                    placeholder="Optional review note for the assignee"
+                    className="min-h-24 rounded-xl border border-emerald-200/20 bg-white/10 px-3 py-3 text-sm text-white outline-none placeholder:text-white/45 transition focus:border-emerald-200 focus:shadow-[0_0_0_4px_rgba(167,243,208,0.18)]"
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+
           <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
             <div className="relative h-56 overflow-hidden">
               <img src={form.image} alt={form.title || "Task preview"} className="h-full w-full object-cover" />
@@ -406,8 +533,12 @@ export default function TaskModal({ open, onClose, onSubmit, initialValues, mode
             <div className="grid gap-4 p-5 text-sm text-slate-300">
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
                 <span>Assignee</span>
+                <span className="font-medium text-white">{selectedUser?.name || "Select a teammate"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">
+                <span>Team</span>
                 <span className="font-medium text-white">
-                  {users.find((user) => user.id === form.assignedUserId)?.name || "Select a teammate"}
+                  {form.assignmentMode === "team" ? selectedTeam?.name || "Select a team" : selectedUserTeamName}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/5 px-4 py-3">

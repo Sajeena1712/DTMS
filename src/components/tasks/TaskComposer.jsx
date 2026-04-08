@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { fetchTeams } from "../../api/adminApi";
 import { fetchUsers } from "../../api/userApi";
 import { statusTone, taskStatuses, taskVisuals } from "../../lib/constants";
 import { parseEmailList } from "./taskAssignment";
@@ -8,10 +9,14 @@ const defaultForm = {
   title: "",
   description: "",
   assignedUserId: "",
+  assignedTeamId: "",
   assignmentMode: "single",
   assigneeEmails: "",
+  priority: "MEDIUM",
   status: "PENDING",
   deadline: "",
+  reviewDecision: "",
+  reviewFeedback: "",
   image: taskVisuals[0],
 };
 
@@ -25,7 +30,9 @@ export default function TaskComposer({
 }) {
   const [form, setForm] = useState(defaultForm);
   const [users, setUsers] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingTeams, setLoadingTeams] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -40,12 +47,16 @@ export default function TaskComposer({
               initialValues.assignedTo ??
               initialValues.assignedUser?.id ??
               "",
+            assignedTeamId: initialValues.teamId ?? initialValues.assignedTeamId ?? "",
             assignmentMode: "single",
             assigneeEmails: "",
+            priority: initialValues.priority ?? "MEDIUM",
             status: initialValues.status ?? "Pending",
             deadline: initialValues.deadline
               ? new Date(initialValues.deadline).toISOString().slice(0, 10)
               : "",
+            reviewDecision: initialValues.review?.decision ?? "",
+            reviewFeedback: initialValues.review?.feedback ?? "",
             image: initialValues.image ?? defaultForm.image,
           }
         : defaultForm,
@@ -80,7 +91,40 @@ export default function TaskComposer({
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadTeams() {
+      setLoadingTeams(true);
+      try {
+        const { teams: teamList } = await fetchTeams();
+        if (active) {
+          setTeams(teamList ?? []);
+        }
+      } catch {
+        if (active) {
+          setTeams([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingTeams(false);
+        }
+      }
+    }
+
+    loadTeams();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const selectedUser = useMemo(() => users.find((user) => user.id === form.assignedUserId), [form.assignedUserId, users]);
+  const selectedTeam = useMemo(() => teams.find((team) => team.id === form.assignedTeamId), [form.assignedTeamId, teams]);
+  const selectedUserTeamName = useMemo(
+    () => selectedUser?.teamName || selectedUser?.team?.name || "No team assigned",
+    [selectedUser?.teamName, selectedUser?.team?.name],
+  );
   const parsedEmails = useMemo(() => parseEmailList(form.assigneeEmails), [form.assigneeEmails]);
 
   const assignmentSummary = useMemo(() => {
@@ -88,12 +132,16 @@ export default function TaskComposer({
       return `${users.length} registered users`;
     }
 
+    if (form.assignmentMode === "team") {
+      return selectedTeam?.name || "No team selected yet";
+    }
+
     if (form.assignmentMode === "emails") {
       return `${parsedEmails.length} email${parsedEmails.length === 1 ? "" : "s"}`;
     }
 
     return selectedUser?.name || "No teammate selected yet";
-  }, [form.assignmentMode, parsedEmails.length, selectedUser?.name, users.length]);
+  }, [form.assignmentMode, parsedEmails.length, selectedTeam?.name, selectedUser?.name, users.length]);
 
   function updateField(event) {
     const { name, value } = event.target;
@@ -108,6 +156,7 @@ export default function TaskComposer({
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
+        priority: form.priority,
         status: form.status,
         deadline: form.deadline || undefined,
         image: form.image,
@@ -115,10 +164,16 @@ export default function TaskComposer({
 
       if (form.assignmentMode === "emails") {
         payload.assignedEmails = parsedEmails;
+      } else if (form.assignmentMode === "team") {
+        payload.assignedTeamId = form.assignedTeamId;
       } else if (form.assignmentMode === "all") {
         payload.assignToAllUsers = true;
       } else {
         payload.assignedUserId = form.assignedUserId;
+        if (form.reviewDecision === "Approved" || form.reviewDecision === "Rejected") {
+          payload.reviewDecision = form.reviewDecision;
+          payload.reviewFeedback = form.reviewFeedback.trim();
+        }
       }
 
       await onSubmit(payload);
@@ -183,6 +238,7 @@ export default function TaskComposer({
             <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Assignment mode</span>
             <select name="assignmentMode" value={form.assignmentMode} onChange={updateField} className="task-select">
               <option value="single">Single user</option>
+              <option value="team">Whole team</option>
               <option value="emails">Multiple registered emails</option>
               <option value="all">All registered users</option>
             </select>
@@ -213,6 +269,30 @@ export default function TaskComposer({
                 <input type="date" name="deadline" value={form.deadline} onChange={updateField} className="task-select" />
               </label>
             </div>
+          ) : form.assignmentMode === "team" ? (
+            <>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Team</span>
+                <select
+                  name="assignedTeamId"
+                  value={form.assignedTeamId}
+                  onChange={updateField}
+                  className="task-select"
+                  required
+                >
+                  <option value="">{loadingTeams ? "Loading teams..." : "Choose a team"}</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Deadline</span>
+                <input type="date" name="deadline" value={form.deadline} onChange={updateField} className="task-select" />
+              </label>
+            </>
           ) : form.assignmentMode === "emails" ? (
             <>
               <label className="grid gap-2">
@@ -245,7 +325,16 @@ export default function TaskComposer({
             </>
           )}
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-3">
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Priority</span>
+              <select name="priority" value={form.priority} onChange={updateField} className="task-select">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </label>
+
             <label className="grid gap-2">
               <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Status</span>
               <select name="status" value={form.status} onChange={updateField} className="task-select">
@@ -269,15 +358,56 @@ export default function TaskComposer({
             </label>
           </div>
 
+          {mode === "edit" ? (
+            <div className="grid gap-4 rounded-3xl border border-emerald-200/60 bg-emerald-50/70 p-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.26em] text-emerald-700">Review decision</p>
+                <p className="mt-2 text-sm leading-7 text-slate-700">
+                  Use this section to approve or reject the task after reviewing the submission.
+                </p>
+              </div>
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Decision</span>
+                  <select
+                    name="reviewDecision"
+                    value={form.reviewDecision}
+                    onChange={updateField}
+                    className="task-select"
+                  >
+                    <option value="">Leave unchanged</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Feedback</span>
+                  <textarea
+                    name="reviewFeedback"
+                    value={form.reviewFeedback}
+                    onChange={updateField}
+                    placeholder="Optional notes for the assignee"
+                    className="task-textarea peer min-h-[130px]"
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid gap-4 rounded-3xl border border-slate-200/80 bg-[linear-gradient(145deg,rgba(79,70,229,0.05),rgba(6,182,212,0.04),rgba(255,255,255,0.92))] p-5 md:grid-cols-3">
             <div>
               <p className="text-xs uppercase tracking-[0.26em] text-slate-500">Priority vibe</p>
               <p className="mt-2 text-sm text-slate-700">
-                {form.status === "COMPLETED"
-                  ? "Ready for archive and stakeholder review."
-                  : form.status === "IN_PROGRESS"
-                    ? "Live execution with active delivery ownership."
-                    : "Queued for kickoff and assignment."}
+                {form.priority === "HIGH"
+                  ? "Needs prompt attention and fast execution."
+                  : form.priority === "LOW"
+                    ? "Flexible pacing with light urgency."
+                    : form.status === "COMPLETED"
+                      ? "Ready for archive and stakeholder review."
+                      : form.status === "IN_PROGRESS"
+                        ? "Live execution with active delivery ownership."
+                        : "Queued for kickoff and assignment."}
               </p>
             </div>
             <div>
@@ -337,13 +467,20 @@ export default function TaskComposer({
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Assigned to</p>
               <p className="mt-2 text-sm font-medium text-slate-950">{assignmentSummary}</p>
               <p className="mt-1 text-sm text-slate-600">
-                {form.assignmentMode === "emails"
+              {form.assignmentMode === "emails"
                   ? `${parsedEmails.length} registered email${parsedEmails.length === 1 ? "" : "s"}`
                   : form.assignmentMode === "all"
                     ? "One task record will be created for each registered student."
                     : selectedUser?.email || "No assignee selected"}
               </p>
             </div>
+            {form.assignmentMode === "single" ? (
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Team</p>
+                <p className="mt-2 text-sm font-medium text-slate-950">{selectedUserTeamName}</p>
+                <p className="mt-1 text-sm text-slate-600">The assignee's current team is shown here for quick checking.</p>
+              </div>
+            ) : null}
             <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Deadline</p>
               <p className="mt-2 text-sm font-medium text-slate-950">{form.deadline || "Not scheduled"}</p>

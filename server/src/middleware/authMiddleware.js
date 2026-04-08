@@ -20,14 +20,15 @@ export async function requireAuth(req, res, next) {
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        emailVerified: true,
-      },
-    });
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          teamId: true,
+          emailVerified: true,
+        },
+      });
 
     if (!user) {
       return res.status(401).json({ message: "User no longer exists" });

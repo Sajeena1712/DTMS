@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
 import TaskCard from "../../components/tasks/TaskCard";
 import TaskModal from "../../components/tasks/TaskModal";
+import TaskReviewModal from "../../components/tasks/TaskReviewModal";
 import TaskSubmissionModal from "../../components/tasks/TaskSubmissionModal";
 import TaskProgressModal from "../../components/tasks/TaskProgressModal";
+import DiscussionNotifications from "../../components/dashboard/DiscussionNotifications";
 import TaskTable from "../../components/dashboard/TaskTable";
 import { showApiError } from "../../api/client";
 import { useAuth } from "../../contexts/AuthContext";
@@ -15,12 +18,17 @@ export default function TaskListPage() {
   const { tasks, loading, createTask, updateTask, deleteTask } = useTasks();
   const { user } = useAuth();
   const isAdmin = isAdminRole(user?.role);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [viewingTask, setViewingTask] = useState(null);
+  const [reviewingTask, setReviewingTask] = useState(null);
+  const [reviewDecision, setReviewDecision] = useState("Approved");
   const [workingTask, setWorkingTask] = useState(null);
+  const [openedNotificationTaskId, setOpenedNotificationTaskId] = useState("");
 
   const filteredTasks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -29,13 +37,36 @@ export default function TaskListPage() {
       const matchesStatus = statusFilter === "All" || task.status === statusFilter;
       const matchesQuery =
         !normalizedQuery ||
-        [task.title, task.description, task.assignedUserName, displayTaskStatus(task.status)]
+        [task.title, task.description, task.assignedUserName, task.teamName, displayTaskStatus(task.status)]
           .filter(Boolean)
           .some((value) => value.toLowerCase().includes(normalizedQuery));
 
       return matchesStatus && matchesQuery;
     });
   }, [query, statusFilter, tasks]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const taskId = params.get("task");
+
+    if (!taskId || taskId === openedNotificationTaskId || !tasks.length) {
+      return;
+    }
+
+    const targetTask = tasks.find((task) => String(task.id) === String(taskId));
+    if (!targetTask) {
+      return;
+    }
+
+    if (isAdmin) {
+      setViewingTask(targetTask);
+    } else {
+      setWorkingTask(targetTask);
+    }
+
+    setOpenedNotificationTaskId(taskId);
+    navigate("/tasks", { replace: true });
+  }, [location.search, tasks, isAdmin, navigate, openedNotificationTaskId]);
 
   async function handleDelete(taskId) {
     try {
@@ -74,34 +105,18 @@ export default function TaskListPage() {
     }
   }
 
-  async function handleApprove(task) {
-    const feedback = window.prompt("Approval feedback for the user (optional):", task.review?.feedback ?? "") ?? "";
-
-    try {
-      await updateTask(task.id, {
-        reviewDecision: "Approved",
-        reviewFeedback: feedback,
-      });
-      toast.success("Task approved");
-    } catch (error) {
-      showApiError(error, "Failed to approve task");
-    }
+  function openReviewModal(task, decision) {
+    setReviewingTask(task);
+    setReviewDecision(decision);
   }
 
-  async function handleReject(task) {
-    const feedback = window.prompt("Enter rejection feedback for the user:", task.review?.feedback ?? "");
-    if (feedback === null) {
-      return;
-    }
-
+  async function handleReview(taskId, values) {
     try {
-      await updateTask(task.id, {
-        reviewDecision: "Rejected",
-        reviewFeedback: feedback,
-      });
-      toast.success("Task rejected");
+      await updateTask(taskId, values);
+      toast.success(values.reviewDecision === "Approved" ? "Task approved" : "Task rejected");
     } catch (error) {
-      showApiError(error, "Failed to reject task");
+      showApiError(error, "Failed to save review");
+      throw error;
     }
   }
 
@@ -169,6 +184,23 @@ export default function TaskListPage() {
         </div>
       </motion.section>
 
+      {!isAdmin ? (
+      <DiscussionNotifications
+        tasks={tasks}
+        title="Your unread discussions"
+        description="Catch up on the latest comments across your assigned tasks."
+        emptyTitle="No unread task discussions"
+        emptyDescription="You're caught up on every task discussion right now."
+        onOpenTask={(task) => {
+          if (isAdmin) {
+            setViewingTask(task);
+          } else {
+            setWorkingTask(task);
+          }
+        }}
+      />
+      ) : null}
+
       <motion.section
         initial={{ opacity: 0, y: 22 }}
         animate={{ opacity: 1, y: 0 }}
@@ -216,8 +248,8 @@ export default function TaskListPage() {
             onView={openViewModal}
             onEdit={openEditModal}
             onDelete={handleDelete}
-            onApprove={handleApprove}
-            onReject={handleReject}
+            onApprove={(task) => openReviewModal(task, "Approved")}
+            onReject={(task) => openReviewModal(task, "Rejected")}
             theme="dark"
           />
         ) : (
@@ -263,6 +295,13 @@ export default function TaskListPage() {
             task={viewingTask}
             onClose={() => setViewingTask(null)}
           />
+          <TaskReviewModal
+            open={Boolean(reviewingTask)}
+            task={reviewingTask}
+            initialDecision={reviewDecision}
+            onClose={() => setReviewingTask(null)}
+            onSubmit={handleReview}
+          />
         </>
       ) : null}
 
@@ -277,3 +316,4 @@ export default function TaskListPage() {
     </div>
   );
 }
+

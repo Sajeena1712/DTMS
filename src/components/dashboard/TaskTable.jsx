@@ -1,5 +1,6 @@
 import { cn } from "../../lib/utils";
 import { displayTaskStatus, normalizeTaskStatus, statusTone } from "../../lib/constants";
+import { hasUnreadTaskDiscussion, truncateText } from "../../lib/utils";
 
 export default function TaskTable({
   tasks,
@@ -34,7 +35,9 @@ export default function TaskTable({
             <tr>
               <th className="px-6 py-4 font-medium">Task Image</th>
               <th className="px-6 py-4 font-medium">Title</th>
+              <th className="px-6 py-4 font-medium">Team</th>
               <th className="px-6 py-4 font-medium">Status</th>
+              <th className="px-6 py-4 font-medium">Score</th>
               <th className="px-6 py-4 font-medium">Deadline</th>
               <th className="px-6 py-4 font-medium">Actions</th>
             </tr>
@@ -55,9 +58,19 @@ export default function TaskTable({
                 </td>
                 <td className="px-6 py-5">
                   <p className={cn("font-semibold", theme === "dark" ? "text-white" : "text-slate-950")}>{task.title}</p>
+                  {hasUnreadTaskDiscussion(task) ? (
+                    <span className="mt-2 inline-flex rounded-full bg-blue-600 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
+                      New discussion
+                    </span>
+                  ) : null}
                   <p className={cn("mt-1 max-w-sm text-xs leading-6", theme === "dark" ? "text-slate-400" : "text-slate-500")}>
                     {task.description}
                   </p>
+                  {task.discussionMeta?.lastCommentMessage ? (
+                    <p className={cn("mt-2 max-w-sm text-xs leading-6", theme === "dark" ? "text-slate-300" : "text-blue-700")}>
+                      Latest discussion: {truncateText(task.discussionMeta.lastCommentMessage, 82)}
+                    </p>
+                  ) : null}
                   {task.review?.feedback ? (
                     <p className={cn("mt-2 max-w-sm text-xs leading-6", theme === "dark" ? "text-slate-300" : "text-slate-600")}>
                       Feedback: {task.review.feedback}
@@ -65,9 +78,46 @@ export default function TaskTable({
                   ) : null}
                 </td>
                 <td className="px-6 py-5">
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[normalizeTaskStatus(task.status)]}`}>
-                    {displayTaskStatus(task.status)}
-                  </span>
+                  <div className="space-y-1">
+                    <p className={cn("font-semibold", theme === "dark" ? "text-white" : "text-slate-950")}>
+                      {task.teamName || task.team?.name || "No team"}
+                    </p>
+                    <p className={cn("text-xs uppercase tracking-[0.18em]", theme === "dark" ? "text-slate-400" : "text-slate-500")}>
+                      {task.assignedUserName || task.assignedUser || "Single user"}
+                    </p>
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[normalizeTaskStatus(task.status)]}`}>
+                      {displayTaskStatus(task.status)}
+                    </span>
+                    {task.review?.decision ? (
+                      <span
+                        className={cn(
+                          "rounded-full px-3 py-1 text-xs font-semibold",
+                          task.review.decision === "Approved"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700",
+                        )}
+                      >
+                        {task.review.decision}
+                      </span>
+                    ) : normalizeTaskStatus(task.status) === "PENDING_REVIEW" ? (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                        Awaiting review
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="px-6 py-5">
+                  {task.review?.score !== undefined && task.review?.score !== null ? (
+                    <span className="inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                      {task.review.score}/100
+                    </span>
+                  ) : (
+                    <span className={cn("text-sm", theme === "dark" ? "text-slate-300" : "text-slate-500")}>--</span>
+                  )}
                 </td>
                 <td className={cn("px-6 py-5", theme === "dark" ? "text-slate-300" : "text-slate-600")}>{task.dueDate}</td>
                 <td className="px-6 py-5">

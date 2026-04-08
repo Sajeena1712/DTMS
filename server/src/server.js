@@ -7,7 +7,7 @@ import ensureAdminUser from "./lib/ensureAdminUser.js";
 dotenv.config({ override: true });
 
 const configuredPort = process.env.PORT || 3000;
-const devFallbackPort = 3001;
+const devFallbackPort = 3002;
 const resolvedPort =
   process.env.NODE_ENV === "production"
     ? configuredPort

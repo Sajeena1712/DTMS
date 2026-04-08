@@ -17,13 +17,37 @@ function validatePassword(password) {
   return /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
 }
 
-export const buildPublicUser = (user) => {
+function normalizeList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(/[\n,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+export const buildPublicUser = (user, profile = null) => {
+  const mergedProfile = profile || {};
   return {
-    id: user.id,
+    id: user.id || String(user._id || ""),
     name: user.name,
     email: user.email,
     role: normalizeRole(user.role),
-    isVerified: Boolean(user.emailVerified),
+    teamId: user.teamId || null,
+    teamName: user.team?.name || mergedProfile.teamName || null,
+    isVerified: Boolean(user.emailVerified ?? user.isVerified),
+    emailVerified: Boolean(user.emailVerified ?? user.isVerified),
+    profilePhoto: mergedProfile.profilePhoto ?? user.profilePhoto ?? null,
+    skills: normalizeList(mergedProfile.skills ?? user.skills),
+    experience: mergedProfile.experience ?? user.experience ?? "",
+    education: mergedProfile.education ?? user.education ?? "",
+    certifications: normalizeList(mergedProfile.certifications ?? user.certifications),
   };
 };
 
@@ -49,6 +73,15 @@ function buildAppUrl(req) {
 function buildClientRoute(req, path) {
   const appUrl = buildAppUrl(req).replace(/\/$/, "");
   return `${appUrl}/#${path}`;
+}
+
+function buildEmailBrandAssets() {
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  return {
+    brandLogoUrl: `${clientUrl}/logo.png`,
+    footerLogoUrl: `${clientUrl}/logo.png`,
+    footerMessage: "Thank you for using DTMS.",
+  };
 }
 
 function buildEmailLayout({ eyebrow, title, intro, actionLabel, actionUrl, footerNote }) {
@@ -116,6 +149,7 @@ async function sendVerificationEmail(req, user, verificationToken) {
       actionLabel: "Confirm Now",
       actionUrl: verifyLink,
       footerNote: "This verification link expires in 24 hours. If you did not create this account, you can ignore this message.",
+      ...buildEmailBrandAssets(),
       accent: "#2563eb",
       accentSoft: "#dbeafe",
       badgeTone: "#2563eb",
@@ -170,7 +204,6 @@ export async function register(req, res, next) {
       });
 
       await sendVerificationEmail(req, existingUser, verificationToken);
-
       return res.status(200).json({
         message: "Your verification email has been resent. Please check your inbox and spam folder.",
         user: buildPublicUser(existingUser),
@@ -187,6 +220,11 @@ export async function register(req, res, next) {
         email: email.toLowerCase(),
         password: passwordHash,
         role: "USER",
+        profilePhoto: null,
+        skills: [],
+        experience: "",
+        education: "",
+        certifications: [],
         emailVerified: false,
         emailVerificationTokenHash: verificationTokenHash,
         emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
@@ -194,7 +232,6 @@ export async function register(req, res, next) {
     });
 
     await sendVerificationEmail(req, user, verificationToken);
-
     res.status(201).json({
       message: "Registration successful. Please check your email to verify your account.",
       user: buildPublicUser(user),
@@ -232,7 +269,6 @@ export async function login(req, res, next) {
 
     const token = generateToken(user.id);
     setAuthCookie(res, token);
-
     res.status(200).json({
       message: "Login successful",
       token,
@@ -243,10 +279,32 @@ export async function login(req, res, next) {
   }
 }
 
-export async function getCurrentUser(req, res) {
-  res.status(200).json({
-    user: buildPublicUser(req.user),
-  });
+export async function getCurrentUser(req, res, next) {
+  try {
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        teamId: true,
+        team: { select: { id: true, name: true } },
+        emailVerified: true,
+        profilePhoto: true,
+        skills: true,
+        experience: true,
+        education: true,
+        certifications: true,
+      },
+    });
+
+    res.status(200).json({
+      user: buildPublicUser(currentUser || req.user),
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function logout(req, res) {
@@ -375,6 +433,7 @@ export async function forgotPassword(req, res, next) {
         actionLabel: "Create Password",
         actionUrl: resetLink,
         footerNote: "This reset link expires in 30 minutes. If you did not request this change, you can ignore this message.",
+        ...buildEmailBrandAssets(),
         accent: "#7c3aed",
         accentSoft: "#ede9fe",
         badgeTone: "#7c3aed",

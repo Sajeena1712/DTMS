@@ -7,9 +7,20 @@ import { useAuth } from "./AuthContext";
 
 const TaskContext = createContext(null);
 
+function getWorkspaceNoticeSeenKey(userId) {
+  return userId ? `dtms_workspace_notice_seen_${userId}` : null;
+}
+
+function resolveTaskTimestamp(task) {
+  const value = task?.createdAt || task?.updatedAt || task?.deadline || null;
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+}
+
 function decorateTasks(tasks) {
   return (tasks ?? []).map((task, index) => {
     const assignedName = task.assignedUser?.name || task.assignedUser || "Unassigned";
+    const teamName = task.team?.name || task.teamName || "";
     const deadline = task.deadline ?? null;
     const dueDate = deadline ? formatDate(deadline) : "--";
     const image = task.image || taskVisuals[index % taskVisuals.length];
@@ -25,6 +36,7 @@ function decorateTasks(tasks) {
       status,
       assignedUser: assignedName,
       assignedUserName: assignedName,
+      teamName,
       deadline,
       dueDate,
       image,
@@ -39,7 +51,7 @@ export function TaskProvider({ children }) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const [noticeSeenAt, setNoticeSeenAt] = useState(null);
 
   const fetchTasks = useCallback(async () => {
     let active = true;
@@ -70,13 +82,69 @@ export function TaskProvider({ children }) {
     }
   }, []);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
-
   const refetch = useCallback(async () => {
     await fetchTasks();
   }, [fetchTasks]);
+
+  useEffect(() => {
+    const noticeKey = getWorkspaceNoticeSeenKey(user?.id);
+    if (!noticeKey || typeof window === "undefined") {
+      setNoticeSeenAt(null);
+      return;
+    }
+
+    const storedValue = window.localStorage.getItem(noticeKey);
+    if (storedValue) {
+      const storedDate = new Date(storedValue);
+      setNoticeSeenAt(Number.isNaN(storedDate.getTime()) ? null : storedDate);
+      return;
+    }
+
+    const latestTaskTimestamp = tasks
+      .map((task) => resolveTaskTimestamp(task))
+      .filter(Boolean)
+      .sort((left, right) => right.getTime() - left.getTime())[0];
+
+    if (latestTaskTimestamp) {
+      window.localStorage.setItem(noticeKey, latestTaskTimestamp.toISOString());
+      setNoticeSeenAt(latestTaskTimestamp);
+    } else {
+      setNoticeSeenAt(null);
+    }
+  }, [tasks, user?.id]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks, user?.id, user?.role]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return undefined;
+    }
+
+    const refreshOnFocus = () => {
+      refetch().catch(() => undefined);
+    };
+
+    const refreshOnVisible = () => {
+      if (document.visibilityState === "visible") {
+        refetch().catch(() => undefined);
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      refetch().catch(() => undefined);
+    }, 30000);
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
+    };
+  }, [refetch, user?.id]);
 
   const createTask = async (payload) => {
     const data = await safeRequest(
@@ -114,9 +182,46 @@ export function TaskProvider({ children }) {
     await refetch();
   };
 
+  const markWorkspaceNoticeSeen = useCallback(() => {
+    const noticeKey = getWorkspaceNoticeSeenKey(user?.id);
+    if (!noticeKey || typeof window === "undefined") {
+      return;
+    }
+
+    const now = new Date();
+    window.localStorage.setItem(noticeKey, now.toISOString());
+    setNoticeSeenAt(now);
+  }, [user?.id]);
+
+  const workspaceNotice = useMemo(() => {
+    const seenAt = noticeSeenAt ? noticeSeenAt.getTime() : 0;
+    const newTasks = tasks
+      .map((task) => ({ task, timestamp: resolveTaskTimestamp(task) }))
+      .filter(({ timestamp }) => timestamp && timestamp.getTime() > seenAt)
+      .sort((left, right) => right.timestamp.getTime() - left.timestamp.getTime());
+
+    if (!newTasks.length) {
+      return { count: 0, title: "", message: "", detail: "", latestTask: null };
+    }
+
+    const latestTask = newTasks[0].task;
+    const count = newTasks.length;
+
+    return {
+      count,
+      title: count === 1 ? "New admin update" : "New admin updates",
+      message:
+        count === 1
+          ? `Admin uploaded a new task: ${latestTask.title}`
+          : `${count} new tasks were uploaded by admin.`,
+      detail: "Open the task to view discussion and chat with admin.",
+      latestTask,
+    };
+  }, [noticeSeenAt, tasks]);
+
   const value = useMemo(
-    () => ({ tasks, loading, createTask, updateTask, deleteTask, refetch }),
-    [tasks, loading, refetch],
+    () => ({ tasks, loading, createTask, updateTask, deleteTask, refetch, workspaceNotice, markWorkspaceNoticeSeen }),
+    [tasks, loading, refetch, workspaceNotice, markWorkspaceNoticeSeen],
   );
 
   return <TaskContext.Provider value={value}>{children}</TaskContext.Provider>;

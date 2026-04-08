@@ -6,6 +6,7 @@ import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
+import teamRoutes from "./routes/teamRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
@@ -73,7 +74,10 @@ app.get("/", (req, res) => {
       "POST /api/tasks",
       "PUT /api/tasks/:taskId",
       "DELETE /api/tasks/:taskId",
+      "GET /api/teams",
+      "POST /api/teams",
       "GET /api/user/dashboard",
+      "PUT /api/user/profile",
     ],
   });
 });
@@ -84,6 +88,7 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api", authRoutes); // keeps legacy /api/login working
+app.use("/api/teams", teamRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/user", userRoutes);
 

@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
 import { displayPriority, displayTaskStatus, normalizePriority, normalizeTaskStatus, priorityTone, statusTone } from "../../lib/constants";
-import { formatDate } from "../../lib/utils";
+import { cn, formatDate, hasUnreadTaskDiscussion, truncateText } from "../../lib/utils";
 
 export default function TaskCard({ task, onOpen }) {
   const status = normalizeTaskStatus(task.status);
   const priority = normalizePriority(task.priority);
   const lateSubmissionReason = task?.reminders?.lateSubmissionReason || task?.lateSubmissionReason || "";
+  const hasUnreadDiscussion = hasUnreadTaskDiscussion(task);
 
   return (
     <motion.button
@@ -26,6 +27,11 @@ export default function TaskCard({ task, onOpen }) {
             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${priorityTone[priority]}`}>
               {displayPriority(priority)} Priority
             </span>
+            {hasUnreadDiscussion ? (
+              <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-[0_10px_25px_rgba(37,99,235,0.28)]">
+                New discussion
+              </span>
+            ) : null}
             {task.isOverdue ? (
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${lateSubmissionReason ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
                 {lateSubmissionReason ? "Late access approved" : "Deadline passed"}
@@ -58,11 +64,35 @@ export default function TaskCard({ task, onOpen }) {
               </div>
             </div>
 
+            {task.teamName || task.team?.name ? (
+              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-cyan-600">Assigned team</p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">{task.teamName || task.team?.name}</p>
+              </div>
+            ) : null}
+
             <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-4">
               <p className="text-xs uppercase tracking-[0.24em] text-blue-500">Current note</p>
               <p className="mt-2 text-sm leading-7 text-slate-700">
                 {task.submission?.text || "Open the task to add a progress note, upload a file, and update the status."}
               </p>
+              {task.discussionMeta?.commentCount ? (
+                <div className="mt-4 rounded-2xl border border-white/60 bg-white/80 px-3 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">
+                      {task.discussionMeta.commentCount} discussion comment{task.discussionMeta.commentCount === 1 ? "" : "s"}
+                    </p>
+                    {task.discussionMeta.lastCommentAt ? (
+                      <span className="text-[11px] text-slate-400">{formatDate(task.discussionMeta.lastCommentAt)}</span>
+                    ) : null}
+                  </div>
+                  <p className={cn("mt-2 text-sm leading-6 text-slate-700", !task.discussionMeta.lastCommentMessage && "italic text-slate-500")}>
+                    {task.discussionMeta.lastCommentMessage
+                      ? `${task.discussionMeta.lastCommentAuthorName || "Discussion"}: ${truncateText(task.discussionMeta.lastCommentMessage, 72)}`
+                      : "No discussion preview available yet."}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             {lateSubmissionReason ? (

@@ -1,8 +1,27 @@
+import { useEffect, useState } from "react";
 import { assetPath } from "../../lib/assetPaths";
 
 export default function GlassLoadingScreen({
   title = "Initializing System...",
+  subtitle = "",
 }) {
+  const greetingLines = [
+    "Welcome back 👋 Keep going, your next step matters.",
+    "You are one login away from progress 🌟",
+    "Small steps every day build big wins 🚀",
+    "Stay focused, stay calm, and move forward 💙",
+    "Your journey is loading with purpose ✨",
+  ];
+  const [activeLine, setActiveLine] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveLine((current) => (current + 1) % greetingLines.length);
+    }, 2600);
+
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="loader-fade-in relative z-10 mx-4 w-full max-w-3xl">
       <div className="absolute inset-0 -z-10 rounded-[36px] bg-[radial-gradient(circle,rgba(79,70,229,0.38)_0%,rgba(168,85,247,0.24)_30%,rgba(6,182,212,0.18)_58%,transparent_76%)] blur-3xl" />
@@ -29,6 +48,14 @@ export default function GlassLoadingScreen({
           <h1 className="mt-6 font-display text-4xl font-semibold tracking-[0.04em] text-white sm:text-5xl">
             {title}
           </h1>
+          {subtitle ? (
+            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-cyan-100/90 sm:text-base">
+              {subtitle}
+            </p>
+          ) : null}
+          <div className="mt-5 min-h-[44px]">
+            <p className="text-lg font-medium text-white/95">{greetingLines[activeLine]}</p>
+          </div>
         </div>
 
         <div className="relative mt-10">

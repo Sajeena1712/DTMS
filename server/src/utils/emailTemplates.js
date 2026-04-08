@@ -27,6 +27,10 @@ export function buildPremiumEmail({
   actionLabel,
   actionUrl,
   footerNote,
+  footerMessage = "Thank you for using DTMS.",
+  footerLogoUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/logo.png`,
+  brandName = "DTMS",
+  brandLogoUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/logo.png`,
   accent = "#2563eb",
   accentSoft = "#dbeafe",
   badgeTone = "#2563eb",
@@ -54,6 +58,13 @@ export function buildPremiumEmail({
         <tr>
           <td>
             <div style="border-radius:30px;background:linear-gradient(135deg,${accentSoft} 0%,#eff6ff 42%,#ffffff 100%);padding:30px 32px;box-shadow:0 20px 60px rgba(15,23,42,0.10);border:1px solid #e2e8f0;">
+              <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:18px;">
+                <img src="${escapeHtml(brandLogoUrl)}" alt="${escapeHtml(brandName)} logo" style="display:block;width:54px;height:54px;border-radius:18px;object-fit:cover;background:#ffffff;box-shadow:0 10px 28px rgba(37,99,235,0.16);" />
+                <div style="text-align:left;">
+                  <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.28em;text-transform:uppercase;color:#2563eb;">${escapeHtml(brandName)}</p>
+                  <p style="margin:4px 0 0;font-size:12px;line-height:1.5;color:#64748b;">Digital talent management made simple.</p>
+                </div>
+              </div>
               <div style="display:inline-block;border-radius:999px;background:#ffffff;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:0.24em;text-transform:uppercase;color:${badgeTone};">
                 ${escapeHtml(eyebrow)}
               </div>
@@ -71,6 +82,14 @@ export function buildPremiumEmail({
                 ${extraHtml}
               </div>
             </div>
+            ${(footerLogoUrl || footerMessage)
+              ? `
+                <div style="margin:18px 0 0;text-align:center;">
+                  ${footerLogoUrl ? `<img src="${escapeHtml(footerLogoUrl)}" alt="DTMS logo" style="display:block;margin:0 auto 10px;width:56px;height:56px;object-fit:contain;" />` : ""}
+                  ${footerMessage ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.7;color:#0f172a;font-weight:700;text-align:center;">${escapeHtml(footerMessage)}</p>` : ""}
+                </div>
+              `
+              : ""}
             <p style="margin:18px 10px 0;font-size:12px;line-height:1.7;color:#64748b;text-align:center;">
               ${escapeHtml(footerNote)}
             </p>

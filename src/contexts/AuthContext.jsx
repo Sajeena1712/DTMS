@@ -57,7 +57,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (payload) => {
-    return runWithLoader("Initializing DTMS...", async () => {
+    return runWithLoader("Signing you in...", async () => {
       const data = await safeRequest(() => api.post("/login", payload), "Login failed");
       localStorage.setItem("dtms_token", data.token);
       setUser(normalizeUser(data.user));
@@ -107,6 +107,18 @@ export function AuthProvider({ children }) {
     });
   };
 
+  const updateProfile = async (payload) => {
+    return runWithLoader("Updating your profile...", async () => {
+      const data = await safeRequest(
+        () => api.put("/user/profile", payload),
+        "Unable to update profile",
+      );
+      setUser(normalizeUser(data.user));
+      toast.success(data.message || "Profile updated successfully");
+      return data;
+    });
+  };
+
   const logout = async () => {
     return runWithLoader("Signing out of DTMS...", async () => {
       try {
@@ -133,9 +145,10 @@ export function AuthProvider({ children }) {
       verifyEmail,
       forgotPassword,
       resetPassword,
+      updateProfile,
       logout,
     }),
-    [user, booting, actionLoading, actionLabel],
+    [user, booting, actionLoading, actionLabel, updateProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -34,6 +34,11 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function normalizePriority(priority) {
+  const normalized = String(priority || "MEDIUM").trim().toUpperCase();
+  return ["LOW", "MEDIUM", "HIGH"].includes(normalized) ? normalized : "MEDIUM";
+}
+
 function resolveStoredUploadPath(fileUrl) {
   if (typeof fileUrl !== "string" || !fileUrl.startsWith("/uploads/")) {
     return null;
@@ -99,13 +104,200 @@ function getLateSubmissionReason(reminders) {
   return typeof reminders.lateSubmissionReason === "string" ? reminders.lateSubmissionReason.trim() : "";
 }
 
-async function loadBulkTaskRecipients({ assignedUserId, assignedEmails, assignToAllUsers }) {
-  if (assignToAllUsers) {
-    return prisma.user.findMany({
-      where: { role: "USER" },
+async function loadProfilePhotoMap(emails = []) {
+  const uniqueEmails = [...new Set(emails.map(normalizeEmail).filter(Boolean))];
+
+  if (!uniqueEmails.length) {
+    return new Map();
+  }
+
+  const profiles = await prisma.user.findMany({
+    where: { email: { in: uniqueEmails } },
+    select: { email: true, profilePhoto: true },
+  });
+  return new Map(
+    profiles.map((profile) => [normalizeEmail(profile.email), typeof profile.profilePhoto === "string" ? profile.profilePhoto : null]),
+  );
+}
+
+async function loadTeamRecipients(teamId) {
+  if (!teamId) {
+    return [];
+  }
+
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: {
+      members: { select: { id: true, name: true, email: true, role: true }, orderBy: { createdAt: "asc" } },
+    },
+  });
+
+  if (!team) {
+    return null;
+  }
+
+  const recipients = [...team.members];
+  if (team.leaderId) {
+    const leader = await prisma.user.findUnique({
+      where: { id: team.leaderId },
       select: { id: true, name: true, email: true, role: true },
-      orderBy: { createdAt: "asc" },
     });
+    if (leader && !recipients.some((member) => member.id === leader.id)) {
+      recipients.unshift(leader);
+    }
+  }
+
+  return {
+    team,
+    recipients: recipients.filter((member) => member.role !== "ADMIN"),
+  };
+}
+
+function toCommentAuthor(user, profilePhoto = null) {
+  return {
+    id: user.id,
+    name: user.name || user.email,
+    email: user.email,
+    role: user.role,
+    avatar: profilePhoto || null,
+  };
+}
+
+function normalizeDiscussionItems(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((item) => ({
+      id: item.id || randomUUID(),
+      parentId: item.parentId || null,
+      message: String(item.message || "").trim(),
+      createdAt: item.createdAt || new Date(),
+      editedAt: item.editedAt || null,
+      author: item.author || null,
+    }))
+    .filter((item) => item.message);
+}
+
+function buildDiscussionTree(items = []) {
+  const nodes = items.map((item) => ({
+    ...item,
+    replies: [],
+  }));
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const roots = [];
+
+  nodes.forEach((node) => {
+    if (node.parentId && byId.has(node.parentId)) {
+      byId.get(node.parentId).replies.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  const sortThread = (thread) => {
+    thread.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    thread.forEach((item) => sortThread(item.replies));
+  };
+
+  sortThread(roots);
+
+  return roots;
+}
+
+function getDiscussionMeta(items = []) {
+  const normalized = normalizeDiscussionItems(items);
+  const latestComment = normalized.reduce((latest, item) => {
+    const currentTime = new Date(item.createdAt).getTime();
+    const latestTime = latest ? new Date(latest.createdAt).getTime() : 0;
+
+    if (Number.isNaN(currentTime)) {
+      return latest;
+    }
+
+    return !latest || currentTime >= latestTime ? item : latest;
+  }, null);
+  const lastCommentAt = normalized.reduce((latest, item) => {
+    const currentTime = new Date(item.createdAt).getTime();
+    return Number.isNaN(currentTime) ? latest : Math.max(latest, currentTime);
+  }, 0);
+
+  return {
+    commentCount: normalized.length,
+    lastCommentAt: lastCommentAt ? new Date(lastCommentAt).toISOString() : null,
+    lastCommentMessage: latestComment?.message || null,
+    lastCommentAuthorName: latestComment?.author?.name || latestComment?.author?.email || null,
+    lastCommentAuthorRole: latestComment?.author?.role || null,
+  };
+}
+
+function collectDescendantIds(items, parentId) {
+  const descendants = [];
+  const stack = [parentId];
+
+  while (stack.length) {
+    const currentId = stack.pop();
+    items.forEach((item) => {
+      if (item.parentId === currentId) {
+        descendants.push(item.id);
+        stack.push(item.id);
+      }
+    });
+  }
+
+  return descendants;
+}
+
+function canManageComment(comment, user) {
+  if (!comment || !user) {
+    return false;
+  }
+
+  return user.role === "ADMIN" || String(comment.author?.id || "") === String(user.id);
+}
+
+async function loadTaskByIdForCurrentUser(taskId, user) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+  });
+
+  if (!task) {
+    return null;
+  }
+
+  const isAdmin = user.role === "ADMIN";
+  const isOwner = String(task.userId) === String(user.id);
+  if (!isAdmin && !isOwner) {
+    const error = new Error("You can only access your assigned tasks");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return task;
+}
+
+async function loadBulkTaskRecipients({ assignedUserId, assignedEmails, assignToAllUsers, assignedTeamId }) {
+  if (assignedTeamId) {
+    const teamResult = await loadTeamRecipients(assignedTeamId);
+    if (!teamResult) {
+      const error = new Error("Assigned team not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return teamResult;
+  }
+
+  if (assignToAllUsers) {
+    return {
+      recipients: await prisma.user.findMany({
+        where: { role: { in: ["USER", "TEAM_LEADER"] } },
+        select: { id: true, name: true, email: true, role: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    };
   }
 
   const parsedEmails = parseEmailList(assignedEmails);
@@ -119,7 +311,7 @@ async function loadBulkTaskRecipients({ assignedUserId, assignedEmails, assignTo
 
     const users = await prisma.user.findMany({
       where: {
-        role: "USER",
+        role: { in: ["USER", "TEAM_LEADER"] },
         email: { in: parsedEmails },
       },
       select: { id: true, name: true, email: true, role: true },
@@ -136,7 +328,9 @@ async function loadBulkTaskRecipients({ assignedUserId, assignedEmails, assignTo
       throw error;
     }
 
-    return parsedEmails.map((email) => usersByEmail.get(email)).filter(Boolean);
+    return {
+      recipients: parsedEmails.map((email) => usersByEmail.get(email)).filter(Boolean),
+    };
   }
 
   if (assignedUserId) {
@@ -145,13 +339,17 @@ async function loadBulkTaskRecipients({ assignedUserId, assignedEmails, assignTo
       select: { id: true, name: true, email: true, role: true },
     });
 
-    return user ? [user] : [];
+    return {
+      recipients: user ? [user] : [],
+    };
   }
 
-  return [];
+  return {
+    recipients: [],
+  };
 }
 
-async function sendTaskAssignmentEmail(task) {
+async function sendTaskAssignmentEmail(task, meta = {}) {
   if (!task?.user?.email) {
     return;
   }
@@ -160,8 +358,12 @@ async function sendTaskAssignmentEmail(task) {
     taskTitle: task.title,
     description: task.description || "",
     status: task.status,
+    priority: task.priority,
     deadline: task.deadline,
     assigneeName: task.user.name,
+    assignedByName: meta.assignedByName || "DTMS Admin",
+    assignedByRole: meta.assignedByRole || "Admin",
+    teamName: meta.teamName || task.team?.name || null,
   });
 
   await sendEmail({
@@ -177,7 +379,7 @@ async function dispatchAssignmentEmails(tasks) {
 
   for (let index = 0; index < tasks.length; index += batchSize) {
     const batch = tasks.slice(index, index + batchSize);
-    await Promise.allSettled(batch.map((task) => sendTaskAssignmentEmail(task)));
+    await Promise.allSettled(batch.map((task) => sendTaskAssignmentEmail(task, task)));
   }
 }
 
@@ -209,6 +411,7 @@ function buildLateSubmissionReminder(reminders, lateSubmissionReason, allowedBy)
 }
 
 function buildSubmissionNotificationEmail({ taskTitle, status, submissionText, submissionFileName }) {
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
   return {
     subject: `DTMS submission received: ${taskTitle}`,
     text: [
@@ -225,7 +428,10 @@ function buildSubmissionNotificationEmail({ taskTitle, status, submissionText, s
       title: "New task submission",
       intro: `A submission has been received for <strong>${taskTitle}</strong>. The task is now marked as <strong>${formatTaskStatus(status) || "Updated"}</strong>.`,
       actionLabel: "Review in DTMS",
-      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
+      actionUrl: `${clientUrl}/tasks`,
+      brandLogoUrl: `${clientUrl}/logo.png`,
+      footerLogoUrl: `${clientUrl}/logo.png`,
+      footerMessage: "Thank you for using DTMS.",
       footerNote: "Review the submission in DTMS and continue the workflow.",
       accent: "#2563eb",
       accentSoft: "#dbeafe",
@@ -240,34 +446,69 @@ function buildSubmissionNotificationEmail({ taskTitle, status, submissionText, s
   };
 }
 
-function buildAssignedTaskEmail({ taskTitle, description, status, deadline, assigneeName }) {
+function buildAssignedTaskEmail({ taskTitle, description, status, priority, deadline, assigneeName, assignedByName, assignedByRole, teamName }) {
   const deadlineLabel = formatDateLabel(deadline);
+  const dashboardUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`;
+  const contactEmail = process.env.CONTACT_EMAIL || "support@dtms.com";
 
   return {
-    subject: `DTMS task assigned: ${taskTitle}`,
+    subject: `DTMS: New task assigned - ${taskTitle}`,
     text: [
-      `You have been assigned "${taskTitle}".`,
-      description ? `Details: ${description}` : null,
-      status ? `Current status: ${formatTaskStatus(status)}` : null,
-      deadlineLabel ? `Deadline: ${deadlineLabel}` : null,
-      "Open DTMS to review the task.",
+      `Dear ${assigneeName || "Student"},`,
+      "",
+      "This email is to inform you about an important update in the Digital Talent Management System.",
+      "",
+      `Task Title: ${taskTitle}`,
+      `Assigned By: ${assignedByName}${assignedByRole ? ` / ${assignedByRole}` : ""}`,
+      teamName ? `Team: ${teamName}` : null,
+      `Deadline: ${deadlineLabel || "Not set"}`,
+      `Priority Level: ${priority || "MEDIUM"}`,
+      description ? `Task Details: ${description}` : null,
+      "",
+      `System Access Link: ${dashboardUrl}`,
+      "",
+      "Kindly log in to the system and review the task details at your earliest convenience.",
+      "Please ensure the task is completed and submitted before the deadline.",
+      "",
+      "If you have any questions or require further clarification, feel free to reach out.",
+      "",
+      `Best regards,`,
+      assignedByName || "DTMS Admin",
+      assignedByRole || "Admin",
+      "Digital Talent Management System",
+      contactEmail,
     ]
       .filter(Boolean)
       .join("\n"),
     html: buildPremiumEmail({
-      eyebrow: "DTMS Task Assignment",
-      title: assigneeName ? `${assigneeName}, new task assigned` : "New task assigned",
-      intro: `A task titled <strong>${taskTitle}</strong> has been assigned to you.`,
-      actionLabel: "Open Task",
-      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
-      footerNote: "Review the task details and update your progress in DTMS.",
+      eyebrow: "Task Notification",
+      title: assigneeName ? `${assigneeName}, you have a new task` : "You have a new task",
+      intro: `
+        Dear ${assigneeName || "Student"},<br /><br />
+        This email is to inform you about an important update in the <strong>Digital Talent Management System</strong>.<br /><br />
+        <strong>Task Details:</strong><br />
+        • Task Title: ${taskTitle}<br />
+        • Assigned By: ${assignedByName}${assignedByRole ? ` / ${assignedByRole}` : ""}<br />
+        ${teamName ? `• Team: ${teamName}<br />` : ""}
+        • Deadline: ${deadlineLabel || "Not set"}<br />
+        • Priority Level: ${priority || "MEDIUM"}<br /><br />
+        Kindly log in to the system and review the task details at your earliest convenience. Please ensure the task is completed and submitted before the deadline.
+      `,
+      actionLabel: "Open Dashboard",
+      actionUrl: dashboardUrl,
+      footerLogoUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/logo.png`,
+      footerMessage: "Thank you for using DTMS.",
+      footerNote: `If you have any questions or require further clarification, feel free to reach out at ${contactEmail}.`,
       accent: "#2563eb",
       accentSoft: "#dbeafe",
       badgeTone: "#2563eb",
       details: [
         { label: "Task", value: taskTitle },
+        { label: "Assigned By", value: `${assignedByName}${assignedByRole ? ` / ${assignedByRole}` : ""}` },
+        ...(teamName ? [{ label: "Team", value: teamName }] : []),
         ...(description ? [{ label: "Summary", value: description }] : []),
         ...(status ? [{ label: "Status", value: formatTaskStatus(status) }] : []),
+        ...(priority ? [{ label: "Priority", value: String(priority).toUpperCase() }] : []),
         ...(deadlineLabel ? [{ label: "Deadline", value: deadlineLabel }] : []),
       ],
       extraHtml: deadline
@@ -282,17 +523,23 @@ function buildAssignedTaskEmail({ taskTitle, description, status, deadline, assi
   };
 }
 
-function buildTaskDecisionEmail({ taskTitle, decision, feedback, deadline }) {
+function buildTaskDecisionEmail({ taskTitle, decision, feedback, score, deadline }) {
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
   const decisionLabel = decision === "Approved" ? "Approved" : "Rejected";
   const isApproved = decisionLabel === "Approved";
   const accent = isApproved ? "#059669" : "#e11d48";
   const accentSoft = isApproved ? "#d1fae5" : "#ffe4e6";
   const title = isApproved ? "Task approved" : "Task rejected";
+  const scoreLabel = score === null || score === undefined || score === "" ? "Not recorded" : `${score}/100`;
+  const scoreText = isApproved ? `Score awarded: ${scoreLabel}.` : "Score was not sent for this rejection.";
 
   return {
-    subject: `DTMS task ${decisionLabel.toLowerCase()}: ${taskTitle}`,
+    subject: isApproved && scoreLabel
+      ? `DTMS task approved: ${taskTitle} (${scoreLabel})`
+      : `DTMS task ${decisionLabel.toLowerCase()}: ${taskTitle}`,
     text: [
       `Your task "${taskTitle}" has been ${decisionLabel.toLowerCase()}.`,
+      scoreText,
       feedback ? `Feedback: ${feedback}` : null,
       deadline ? `Deadline: ${formatDateLabel(deadline)}` : null,
       "Open DTMS to review the decision.",
@@ -302,9 +549,12 @@ function buildTaskDecisionEmail({ taskTitle, decision, feedback, deadline }) {
     html: buildPremiumEmail({
       eyebrow: `DTMS ${decisionLabel}`,
       title,
-      intro: `Your task <strong>${taskTitle}</strong> has been <strong>${decisionLabel.toLowerCase()}</strong>.`,
+      intro: `Your task <strong>${taskTitle}</strong> has been <strong>${decisionLabel.toLowerCase()}</strong>. ${isApproved ? `Your score is <strong>${scoreLabel}</strong>.` : ""}`,
       actionLabel: "Open Task",
-      actionUrl: `${process.env.CLIENT_URL || "http://localhost:5173"}/tasks`,
+      actionUrl: `${clientUrl}/tasks`,
+      brandLogoUrl: `${clientUrl}/logo.png`,
+      footerLogoUrl: `${clientUrl}/logo.png`,
+      footerMessage: "Thank you for using DTMS.",
       footerNote: isApproved
         ? "Approval confirmed. You may continue in DTMS."
         : "Review the feedback, revise your work, and resubmit when ready.",
@@ -314,6 +564,7 @@ function buildTaskDecisionEmail({ taskTitle, decision, feedback, deadline }) {
       details: [
         { label: "Task", value: taskTitle },
         { label: "Decision", value: decisionLabel },
+        ...(isApproved ? [{ label: "Score", value: scoreLabel }] : []),
         ...(feedback ? [{ label: "Feedback", value: feedback }] : []),
       ],
       extraHtml: deadline
@@ -345,19 +596,216 @@ function serializeTask(task) {
           role: task.user.role,
         }
       : undefined,
+    teamId: task.teamId || null,
+    team: task.team
+      ? {
+          id: task.team.id,
+          name: task.team.name,
+        }
+      : null,
     submission: task.submission,
     reminders: task.reminders,
+    discussion: task.discussion,
+    discussionMeta: getDiscussionMeta(task.discussion),
     review: task.review
       ? {
-          decision: task.review.decision,
-          feedback: task.review.feedback,
-          reviewedAt: task.review.reviewedAt,
-          reviewedBy: task.review.reviewedBy,
-        }
+        decision: task.review.decision,
+        score: task.review.score,
+        feedback: task.review.feedback,
+        reviewedAt: task.review.reviewedAt,
+        reviewedBy: task.review.reviewedBy,
+      }
       : undefined,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
+}
+
+function buildCommentRecord({ id, parentId = null, message, author, createdAt = new Date() }) {
+  return {
+    id: id || randomUUID(),
+    parentId: parentId || null,
+    message: String(message || "").trim(),
+    author,
+    createdAt,
+  };
+}
+
+export async function getTaskDiscussion(req, res, next) {
+  try {
+    const { taskId } = req.params;
+    if (!taskId) {
+      return res.status(400).json({ message: "Invalid task id" });
+    }
+
+    const task = await loadTaskByIdForCurrentUser(taskId, req.user);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const comments = normalizeDiscussionItems(task.discussion);
+    const profileMap = await loadProfilePhotoMap([
+      ...comments.map((comment) => comment.author?.email),
+      req.user.email,
+    ]);
+
+    const resolvedComments = comments.map((comment) => ({
+      ...comment,
+      author: {
+        ...comment.author,
+        avatar: profileMap.get(normalizeEmail(comment.author?.email)) || comment.author?.avatar || null,
+      },
+    }));
+
+    return res.status(200).json({
+      comments: buildDiscussionTree(resolvedComments),
+      totalComments: resolvedComments.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function addTaskComment(req, res, next) {
+  try {
+    const { taskId } = req.params;
+    const { message, parentId } = req.body;
+
+    if (!taskId) {
+      return res.status(400).json({ message: "Invalid task id" });
+    }
+
+    const trimmedMessage = String(message || "").trim();
+    if (!trimmedMessage) {
+      return res.status(400).json({ message: "Comment message is required" });
+    }
+
+    const task = await loadTaskByIdForCurrentUser(taskId, req.user);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const discussion = normalizeDiscussionItems(task.discussion);
+    const profileMap = await loadProfilePhotoMap([req.user.email]);
+    const author = toCommentAuthor(req.user, profileMap.get(normalizeEmail(req.user.email)) || null);
+    const comment = buildCommentRecord({
+      parentId: parentId || null,
+      message: trimmedMessage,
+      author,
+    });
+
+    if (comment.parentId && !discussion.some((item) => item.id === comment.parentId)) {
+      return res.status(400).json({ message: "Reply target not found" });
+    }
+
+    discussion.push(comment);
+
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: { discussion },
+    });
+
+    return res.status(201).json({
+      comment,
+      comments: buildDiscussionTree(normalizeDiscussionItems(updatedTask.discussion)),
+      totalComments: discussion.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateTaskComment(req, res, next) {
+  try {
+    const { taskId, commentId } = req.params;
+    const { message } = req.body;
+
+    if (!taskId || !commentId) {
+      return res.status(400).json({ message: "Invalid comment id" });
+    }
+
+    const trimmedMessage = String(message || "").trim();
+    if (!trimmedMessage) {
+      return res.status(400).json({ message: "Comment message is required" });
+    }
+
+    const task = await loadTaskByIdForCurrentUser(taskId, req.user);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const discussion = normalizeDiscussionItems(task.discussion);
+    const commentIndex = discussion.findIndex((item) => item.id === commentId);
+    if (commentIndex === -1) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    const existingComment = discussion[commentIndex];
+    if (!canManageComment(existingComment, req.user)) {
+      return res.status(403).json({ message: "You can only edit your own comment" });
+    }
+
+    discussion[commentIndex] = {
+      ...existingComment,
+      message: trimmedMessage,
+      editedAt: new Date(),
+    };
+
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: { discussion },
+    });
+
+    return res.status(200).json({
+      comment: discussion[commentIndex],
+      comments: buildDiscussionTree(normalizeDiscussionItems(updatedTask.discussion)),
+      totalComments: discussion.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteTaskComment(req, res, next) {
+  try {
+    const { taskId, commentId } = req.params;
+
+    if (!taskId || !commentId) {
+      return res.status(400).json({ message: "Invalid comment id" });
+    }
+
+    const task = await loadTaskByIdForCurrentUser(taskId, req.user);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    const discussion = normalizeDiscussionItems(task.discussion);
+    const targetComment = discussion.find((item) => item.id === commentId);
+    if (!targetComment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    if (!canManageComment(targetComment, req.user)) {
+      return res.status(403).json({ message: "You can only delete your own comment" });
+    }
+
+    const descendantIds = collectDescendantIds(discussion, commentId);
+    const removalIds = new Set([commentId, ...descendantIds]);
+    const nextDiscussion = discussion.filter((item) => !removalIds.has(item.id));
+
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: { discussion: nextDiscussion },
+    });
+
+    return res.status(200).json({
+      message: "Comment deleted",
+      comments: buildDiscussionTree(normalizeDiscussionItems(updatedTask.discussion)),
+      totalComments: nextDiscussion.length,
+    });
+  } catch (error) {
+    next(error);
+  }
 }
 
 export async function getTasks(req, res, next) {
@@ -367,6 +815,7 @@ export async function getTasks(req, res, next) {
       where,
       include: {
         user: { select: { id: true, name: true, email: true, role: true } },
+        team: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -386,11 +835,13 @@ export async function createTask(req, res, next) {
       description,
       deadline,
       lateSubmissionReason,
+      priority,
       assignedUser,
       assignedUserId,
       assignedTo,
       assignedEmails,
       assignToAllUsers,
+      assignedTeamId,
       status,
     } = req.body;
 
@@ -399,11 +850,14 @@ export async function createTask(req, res, next) {
     }
 
     const targetUserId = assignedUserId || assignedUser || assignedTo;
-    const targetUsers = await loadBulkTaskRecipients({
+    const recipientResult = await loadBulkTaskRecipients({
       assignedUserId: targetUserId,
       assignedEmails,
       assignToAllUsers,
+      assignedTeamId,
     });
+    const targetUsers = recipientResult?.recipients || [];
+    const targetTeam = recipientResult?.team || null;
 
     if (targetUsers.length === 0) {
       return res.status(400).json({
@@ -415,8 +869,10 @@ export async function createTask(req, res, next) {
       title: title.trim(),
       description: description?.trim(),
       deadline: deadline ? new Date(deadline) : undefined,
+      priority: normalizePriority(priority),
       status: status || "PENDING",
       reminders: buildLateSubmissionReminder(undefined, lateSubmissionReason, req.user.id),
+      teamId: targetTeam?.id || undefined,
     };
 
     const createdTasks = [];
@@ -429,6 +885,11 @@ export async function createTask(req, res, next) {
             data: {
               ...baseData,
               userId: user.id,
+              teamId: targetTeam?.id || null,
+            },
+            include: {
+              user: { select: { id: true, name: true, email: true, role: true } },
+              team: { select: { id: true, name: true } },
             },
           });
 
@@ -444,10 +905,17 @@ export async function createTask(req, res, next) {
 
     if (createdTasks.length === 1) {
       try {
-        await sendTaskAssignmentEmail({
-          ...createdTasks[0],
-          user: targetUsers[0],
-        });
+        await sendTaskAssignmentEmail(
+          {
+            ...createdTasks[0],
+            user: targetUsers[0],
+          },
+          {
+            assignedByName: req.user.name || "DTMS Admin",
+            assignedByRole: req.user.role || "Admin",
+            teamName: targetTeam?.name || null,
+          },
+        );
       } catch (emailError) {
         console.error("Task assignment email failed", emailError);
       }
@@ -462,6 +930,9 @@ export async function createTask(req, res, next) {
         createdTasks.map((task, index) => ({
           ...task,
           user: targetUsers[index],
+          assignedByName: req.user.name || "DTMS Admin",
+          assignedByRole: req.user.role || "Admin",
+          teamName: targetTeam?.name || null,
         })),
       ).catch((emailError) => {
         console.error("Bulk task assignment email failed", emailError);
@@ -472,6 +943,12 @@ export async function createTask(req, res, next) {
       message: `Task assigned to ${createdTasks.length} students`,
       tasks: createdTasks,
       count: createdTasks.length,
+      team: targetTeam
+        ? {
+            id: targetTeam.id,
+            name: targetTeam.name,
+          }
+        : null,
     });
   } catch (error) {
     next(error);
@@ -486,6 +963,7 @@ export async function updateTask(req, res, next) {
       description,
       deadline,
       lateSubmissionReason,
+      priority,
       assignedUser,
       assignedUserId,
       assignedTo,
@@ -495,6 +973,7 @@ export async function updateTask(req, res, next) {
       submissionFileUrl,
       submissionFileData,
       reviewDecision,
+      reviewScore,
       reviewFeedback,
     } = req.body;
 
@@ -504,7 +983,10 @@ export async function updateTask(req, res, next) {
 
     const existing = await prisma.task.findUnique({
       where: { id: taskId },
-      include: { user: { select: { id: true, name: true, email: true, role: true } } },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+        team: { select: { id: true, name: true } },
+      },
     });
     if (!existing) {
       return res.status(404).json({ message: "Task not found" });
@@ -532,13 +1014,23 @@ export async function updateTask(req, res, next) {
       if (typeof title === "string") update.title = title.trim();
       if (typeof description === "string") update.description = description.trim();
       if (deadline !== undefined) update.deadline = deadline ? new Date(deadline) : null;
+      if (priority !== undefined) update.priority = normalizePriority(priority);
       if (lateSubmissionReason !== undefined) {
         update.reminders = buildLateSubmissionReminder(existing.reminders, lateSubmissionReason, req.user.id);
       }
       if (typeof status === "string") update.status = status;
       if (reviewDecision === "Approved" || reviewDecision === "Rejected") {
+        const parsedScore = reviewScore === undefined || reviewScore === null || reviewScore === ""
+          ? null
+          : Number(reviewScore);
+
+        if (parsedScore !== null && (!Number.isFinite(parsedScore) || parsedScore < 0 || parsedScore > 100)) {
+          return res.status(400).json({ message: "Review score must be a number between 0 and 100" });
+        }
+
         update.review = {
           decision: reviewDecision,
+          score: parsedScore,
           feedback: reviewFeedback ? String(reviewFeedback).trim() : "",
           reviewedAt: new Date(),
           reviewedBy: req.user.id,
@@ -606,6 +1098,7 @@ export async function updateTask(req, res, next) {
       data: update,
       include: {
         user: { select: { id: true, name: true, email: true, role: true } },
+        team: { select: { id: true, name: true } },
       },
     });
 
@@ -656,11 +1149,12 @@ export async function updateTask(req, res, next) {
       }
     }
 
-    if (isAdmin && (reviewDecision === "Approved" || reviewDecision === "Rejected") && task.user?.email) {
+    if (isAdmin && reviewDecision === "Approved" && task.user?.email) {
       try {
         const decisionEmail = buildTaskDecisionEmail({
           taskTitle: task.title,
           decision: reviewDecision,
+          score: task.review?.score ?? update.review?.score ?? null,
           feedback: reviewFeedback ? String(reviewFeedback).trim() : "",
           deadline: task.deadline,
         });
@@ -673,6 +1167,27 @@ export async function updateTask(req, res, next) {
         });
       } catch (emailError) {
         console.error("Task decision email failed", emailError);
+      }
+    }
+
+    if (isAdmin && reviewDecision === "Rejected" && task.user?.email) {
+      try {
+        const rejectionEmail = buildTaskDecisionEmail({
+          taskTitle: task.title,
+          decision: reviewDecision,
+          feedback: reviewFeedback ? String(reviewFeedback).trim() : "",
+          score: null,
+          deadline: task.deadline,
+        });
+
+        await sendEmail({
+          to: task.user.email,
+          subject: rejectionEmail.subject,
+          text: rejectionEmail.text,
+          html: rejectionEmail.html,
+        });
+      } catch (emailError) {
+        console.error("Task rejection email failed", emailError);
       }
     }
 

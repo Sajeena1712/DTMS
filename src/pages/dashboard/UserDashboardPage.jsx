@@ -12,9 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useNavigate } from "react-router-dom";
 import MetricCard from "../../components/dashboard/MetricCard";
-import DiscussionNotifications from "../../components/dashboard/DiscussionNotifications";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTasks } from "../../contexts/TaskContext";
 import { displayTaskStatus, normalizeTaskStatus } from "../../lib/constants";
@@ -37,7 +35,6 @@ function formatTimeline(tasks) {
 export default function UserDashboardPage() {
   const { user } = useAuth();
   const { tasks } = useTasks();
-  const navigate = useNavigate();
 
   const stats = useMemo(() => {
     const totalTasks = tasks.length;
@@ -100,15 +97,6 @@ export default function UserDashboardPage() {
         <MetricCard label="Ongoing" value={stats.ongoingTasks} detail="Work currently in progress." accent="cyan" />
         <MetricCard label="Pending" value={stats.pendingTasks} detail="Items still needing action." accent="rose" />
       </section>
-
-      <DiscussionNotifications
-        tasks={tasks}
-        title="Comment notifications"
-        description="Keep an eye on new replies or feedback left inside your assigned task threads."
-        emptyTitle="No comment notifications"
-        emptyDescription="You’re all caught up on your current task discussions."
-        onOpenTask={(task) => navigate(`/tasks?task=${task.id}`)}
-      />
 
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <article className="task-panel p-6">
@@ -197,18 +185,18 @@ export default function UserDashboardPage() {
         </article>
 
         <article className="task-panel p-6">
-            <p className="text-xs uppercase tracking-[0.28em] text-blue-500">Time tracker</p>
-            <h2 className="mt-3 text-2xl font-semibold text-slate-950">Focus tracker</h2>
-            <div className="mt-5 rounded-[24px] bg-[linear-gradient(145deg,#dbeafe_0%,#eff6ff_55%,#ffffff_100%)] p-5">
-              <p className="text-sm text-slate-600">Tracked focus this week</p>
-              <p className="mt-2 text-4xl font-semibold text-slate-950">{Math.max(tasks.length * 2, 8)}h</p>
-              <div className="mt-4 h-3 rounded-full bg-white">
-                <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#2563eb_0%,#60a5fa_100%)]"
-                  style={{ width: `${Math.min(100, 30 + tasks.length * 8)}%` }}
-                />
-              </div>
+          <p className="text-xs uppercase tracking-[0.28em] text-blue-500">Time tracker</p>
+          <h2 className="mt-3 text-2xl font-semibold text-slate-950">Focus tracker</h2>
+          <div className="mt-5 rounded-[24px] bg-[linear-gradient(145deg,#dbeafe_0%,#eff6ff_55%,#ffffff_100%)] p-5">
+            <p className="text-sm text-slate-600">Tracked focus this week</p>
+            <p className="mt-2 text-4xl font-semibold text-slate-950">{Math.max(tasks.length * 2, 8)}h</p>
+            <div className="mt-4 h-3 rounded-full bg-white">
+              <div
+                className="h-full rounded-full bg-[linear-gradient(90deg,#2563eb_0%,#60a5fa_100%)]"
+                style={{ width: `${Math.min(100, 30 + tasks.length * 8)}%` }}
+              />
             </div>
+          </div>
         </article>
       </section>
     </div>

@@ -201,7 +201,7 @@ export function TaskProvider({ children }) {
       .sort((left, right) => right.timestamp.getTime() - left.timestamp.getTime());
 
     if (!newTasks.length) {
-      return { count: 0, title: "", message: "", detail: "", latestTask: null };
+      return { count: 0, title: "", message: "", detail: "", latestTask: null, items: [] };
     }
 
     const latestTask = newTasks[0].task;
@@ -216,6 +216,7 @@ export function TaskProvider({ children }) {
           : `${count} new tasks were uploaded by admin.`,
       detail: "Open the task to view discussion and chat with admin.",
       latestTask,
+      items: newTasks,
     };
   }, [noticeSeenAt, tasks]);
 

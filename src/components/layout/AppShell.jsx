@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { adminNavLinks, userNavLinks } from "../../lib/constants";
 import { cn } from "../../lib/utils";
@@ -20,14 +21,32 @@ export default function AppShell({ children, variant }) {
   const { user, logout } = useAuth();
   const { workspaceNotice, markWorkspaceNoticeSeen } = useTasks();
   const navigate = useNavigate();
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const visibleLinks = variant === "admin" ? adminNavLinks : userNavLinks;
   const profileImage = resolveApiUrl(user?.profilePhoto);
   const showWorkspaceNotice = variant !== "admin" && workspaceNotice?.count > 0;
+  const notificationItems = workspaceNotice?.items || [];
 
   function openWorkspaceUpdates(task = null) {
     markWorkspaceNoticeSeen();
+    setShowNotificationsPanel(false);
     navigate(task?.id ? `/tasks?task=${task.id}` : "/tasks");
   }
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setShowNotificationsPanel(false);
+      }
+    }
+
+    if (showNotificationsPanel) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+
+    return undefined;
+  }, [showNotificationsPanel]);
 
   return (
     <div className="relative h-screen overflow-hidden bg-slate-950 px-4 py-4 md:px-6 lg:px-8">
@@ -106,36 +125,7 @@ export default function AppShell({ children, variant }) {
         </aside>
 
         <div className="flex min-h-0 flex-col gap-5">
-          {showWorkspaceNotice ? (
-            <div className="rounded-[28px] border border-blue-100 bg-[linear-gradient(145deg,#eff6ff_0%,#ffffff_55%,#f8fafc_100%)] px-5 py-4 shadow-[0_14px_40px_rgba(59,130,246,0.08)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.28em] text-blue-500">Notification</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-950">{workspaceNotice.title}</p>
-                  <p className="mt-1 text-sm text-slate-600">{workspaceNotice.message}</p>
-                  {workspaceNotice.detail ? <p className="mt-1 text-xs text-slate-500">{workspaceNotice.detail}</p> : null}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openWorkspaceUpdates(workspaceNotice.latestTask)}
-                    className="rounded-2xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-50"
-                  >
-                    Open task
-                  </button>
-                  <button
-                    type="button"
-                    onClick={markWorkspaceNoticeSeen}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    Mark seen
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <header className="flex items-center justify-center rounded-[32px] border border-blue-100 bg-white p-5 shadow-[0_18px_50px_rgba(59,130,246,0.08)]">
+          <header className="flex items-center justify-between gap-4 rounded-[32px] border border-blue-100 bg-white p-5 shadow-[0_18px_50px_rgba(59,130,246,0.08)]">
             <div className="max-w-3xl rounded-[36px] bg-[linear-gradient(145deg,#dbeafe_0%,#eff6ff_55%,#ffffff_100%)] px-8 py-7 text-center">
               <p className="text-[11px] font-semibold uppercase tracking-[0.36em] text-blue-500">
                 DTMS
@@ -147,11 +137,101 @@ export default function AppShell({ children, variant }) {
                 Every great workflow starts with a calm mind and a bold next step.
               </p>
             </div>
+
+            {showWorkspaceNotice ? (
+              <button
+                type="button"
+                onClick={() => setShowNotificationsPanel(true)}
+                className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-[linear-gradient(145deg,#eff6ff_0%,#ffffff_55%,#f8fafc_100%)] text-blue-700 shadow-[0_14px_34px_rgba(59,130,246,0.12)] transition hover:-translate-y-0.5 hover:border-blue-200"
+                aria-label={`Open ${workspaceNotice.count} notifications`}
+                title="Open notifications"
+              >
+                <span className="text-xl font-semibold">!</span>
+                <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-[0_10px_20px_rgba(37,99,235,0.22)]">
+                  {workspaceNotice.count}
+                </span>
+              </button>
+            ) : null}
           </header>
 
           <main className="min-h-0 flex-1 overflow-y-auto space-y-5 pr-1">{children}</main>
         </div>
       </div>
+
+      {showWorkspaceNotice && showNotificationsPanel ? (
+        <div className="absolute inset-0 z-30">
+          <button
+            type="button"
+            aria-label="Close notifications"
+            className="absolute inset-0 bg-slate-950/35 backdrop-blur-[1px]"
+            onClick={() => setShowNotificationsPanel(false)}
+          />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-blue-100 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-blue-500">Notifications</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-950">All updates</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNotificationsPanel(false)}
+                className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="rounded-[24px] border border-blue-100 bg-[linear-gradient(145deg,#eff6ff_0%,#ffffff_55%,#f8fafc_100%)] p-5">
+                <p className="text-sm font-semibold text-slate-950">{workspaceNotice.title}</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">{workspaceNotice.message}</p>
+                {workspaceNotice.detail ? <p className="mt-2 text-xs text-slate-500">{workspaceNotice.detail}</p> : null}
+                <button
+                  type="button"
+                  onClick={() => markWorkspaceNoticeSeen()}
+                  className="mt-4 rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+                >
+                  Mark all seen
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {notificationItems.length ? (
+                  notificationItems.map(({ task, timestamp }) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => openWorkspaceUpdates(task)}
+                      className="w-full rounded-[22px] border border-slate-200 bg-slate-50/80 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-[0_16px_36px_rgba(59,130,246,0.10)]"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-600 shadow-[0_0_0_6px_rgba(37,99,235,0.12)]" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="truncate text-sm font-semibold text-slate-950">{task.title}</p>
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+                              New
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{workspaceNotice.detail}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                            <span>{timestamp ? new Date(timestamp).toLocaleString() : ""}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+                    <p className="text-sm font-semibold text-slate-950">No notifications</p>
+                    <p className="mt-2 text-sm leading-7 text-slate-500">You are all caught up right now.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 }

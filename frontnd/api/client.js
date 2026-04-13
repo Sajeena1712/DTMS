@@ -1,7 +1,7 @@
 import axios from "axios";
 import toast from "react-hot-toast";
 
-const productionApiBaseUrl = "https://dtms-backend-983n.onrender.com/api";
+const productionApiBaseUrl = "https://dtms-80uh.onrender.com/api";
 const apiBaseUrl = import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_BASE_URL || productionApiBaseUrl);
 
 const api = axios.create({

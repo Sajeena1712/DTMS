@@ -41,30 +41,34 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-async function startServer() {
-  try {
-    await connectDatabase();
-    const admin = await ensureAdminUser();
-    console.log(`Admin account ready in Prisma: ${admin.email}`);
-    startTaskReminderScheduler();
-    const server = app.listen(resolvedPort, () => {
-      console.log(`DTMS server running on http://localhost:${resolvedPort}`);
+function startBackgroundServices() {
+  connectDatabase()
+    .then(async () => {
+      const admin = await ensureAdminUser();
+      console.log(`Admin account ready in Prisma: ${admin.email}`);
+      startTaskReminderScheduler();
+    })
+    .catch((error) => {
+      console.error("Failed to initialize database-backed services", error);
     });
+}
 
-    server.on("error", (error) => {
-      if (error?.code === "EADDRINUSE") {
-        console.error(
-          `Port ${resolvedPort} is already in use. Stop the existing process or set PORT to a free port, then rerun the server.`,
-        );
-      } else {
-        console.error("Failed to start DTMS server", error);
-      }
-      process.exit(1);
-    });
-  } catch (error) {
-    console.error("Failed to start DTMS server", error);
+function startServer() {
+  const server = app.listen(resolvedPort, () => {
+    console.log(`DTMS server running on http://localhost:${resolvedPort}`);
+    startBackgroundServices();
+  });
+
+  server.on("error", (error) => {
+    if (error?.code === "EADDRINUSE") {
+      console.error(
+        `Port ${resolvedPort} is already in use. Stop the existing process or set PORT to a free port, then rerun the server.`,
+      );
+    } else {
+      console.error("Failed to start DTMS server", error);
+    }
     process.exit(1);
-  }
+  });
 }
 
 startServer();

@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                        String   @id @default(cuid()) @map("_id")
+  email                     String   @unique
+  password                  String
+  name                      String?
+  role                      Role     @default(USER)
+  teamId                    String?
+  profilePhoto              String?
+  skills                    Json?
+  experience                String?
+  education                 String?
+  certifications            Json?
+  emailVerified             Boolean  @default(false)
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash    String?
+  passwordResetExpiresAt    DateTime?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  team        Team?   @relation("TeamMembers", fields: [teamId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tasks       Task[]
+  applications Application[]
+
+  @@map("users")
+}
+
+model Task {
+  id          String     @id @default(cuid()) @map("_id")
+  title       String
+  description String?
+  deadline    DateTime?
+  status      TaskStatus @default(PENDING)
+  priority    Priority   @default(MEDIUM)
+  userId      String
+  teamId      String?
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team        Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  submission  Json?
+  aiEvaluation Json?
+  reminders   Json?
+  review      Json?
+  discussion  Json?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId])
+  @@map("tasks")
+}
+
+model AiWorkflowSettings {
+  id                   String   @id @default(cuid()) @map("_id")
+  autoApproveThreshold  Int      @default(80)
+  autoRejectThreshold   Int      @default(50)
+  aiPromptRules         String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("ai_workflow_settings")
+}
+
+
+model Team {
+  id          String   @id @default(cuid()) @map("_id")
+  name        String   @unique
+  description String?
+  leaderId    String?
+  members     User[]   @relation("TeamMembers")
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("teams")
+}
+
+model Application {
+  id       String            @id @default(cuid()) @map("_id")
+  userId   String
+  company  String
+  role     String
+  salary   String
+  location String
+  status   ApplicationStatus @default(APPLIED)
+  date     DateTime
+  image    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("applications")
+}
+
+enum Role {
+  USER
+  TEAM_LEADER
+  ADMIN
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  PENDING_REVIEW
+  COMPLETED
+  REJECTED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SELECTED
+  REJECTED
+}

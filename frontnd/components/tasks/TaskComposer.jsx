@@ -1,0 +1,628 @@
+import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { motion } from "framer-motion";
+import { generateTaskDescription } from "../../api/aiApi";
+import { fetchTeams } from "../../api/adminApi";
+import { fetchUsers } from "../../api/userApi";
+import { statusTone, taskStatuses, taskVisuals } from "../../lib/constants";
+import { parseEmailList } from "./taskAssignment";
+
+const defaultForm = {
+  title: "",
+  description: "",
+  assignedUserId: "",
+  assignedTeamId: "",
+  assignmentMode: "single",
+  assigneeEmails: "",
+  priority: "MEDIUM",
+  status: "PENDING",
+  deadline: "",
+  reviewDecision: "",
+  reviewFeedback: "",
+  image: taskVisuals[0],
+};
+
+export default function TaskComposer({
+  mode = "create",
+  initialValues,
+  onSubmit,
+  onCancel,
+  savingLabel = "Saving...",
+  idleLabel = "Create task",
+}) {
+  const [form, setForm] = useState(defaultForm);
+  const [users, setUsers] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [aiDraft, setAiDraft] = useState(null);
+
+  useEffect(() => {
+    setForm(
+      initialValues
+        ? {
+            ...defaultForm,
+            title: initialValues.title ?? "",
+            description: initialValues.description ?? "",
+            assignedUserId:
+              initialValues.assignedUserId ??
+              initialValues.assignedTo ??
+              initialValues.assignedUser?.id ??
+              "",
+            assignedTeamId: initialValues.teamId ?? initialValues.assignedTeamId ?? "",
+            assignmentMode: "single",
+            assigneeEmails: "",
+            priority: initialValues.priority ?? "MEDIUM",
+            status: initialValues.status ?? "Pending",
+            deadline: initialValues.deadline
+              ? new Date(initialValues.deadline).toISOString().slice(0, 10)
+              : "",
+            reviewDecision: initialValues.review?.decision ?? "",
+            reviewFeedback: initialValues.review?.feedback ?? "",
+            image: initialValues.image ?? defaultForm.image,
+          }
+        : defaultForm,
+    );
+  }, [initialValues]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadUsers() {
+      setLoadingUsers(true);
+      try {
+        const { users: userList } = await fetchUsers();
+        if (active) {
+          setUsers(userList ?? []);
+        }
+      } catch {
+        if (active) {
+          setUsers([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingUsers(false);
+        }
+      }
+    }
+
+    loadUsers();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTeams() {
+      setLoadingTeams(true);
+      try {
+        const { teams: teamList } = await fetchTeams();
+        if (active) {
+          setTeams(teamList ?? []);
+        }
+      } catch {
+        if (active) {
+          setTeams([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingTeams(false);
+        }
+      }
+    }
+
+    loadTeams();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedUser = useMemo(() => users.find((user) => user.id === form.assignedUserId), [form.assignedUserId, users]);
+  const selectedTeam = useMemo(() => teams.find((team) => team.id === form.assignedTeamId), [form.assignedTeamId, teams]);
+  const selectedUserTeamName = useMemo(
+    () => selectedUser?.teamName || selectedUser?.team?.name || "No team assigned",
+    [selectedUser?.teamName, selectedUser?.team?.name],
+  );
+  const parsedEmails = useMemo(() => parseEmailList(form.assigneeEmails), [form.assigneeEmails]);
+
+  const assignmentSummary = useMemo(() => {
+    if (form.assignmentMode === "all") {
+      return `${users.length} registered users`;
+    }
+
+    if (form.assignmentMode === "team") {
+      return selectedTeam?.name || "No team selected yet";
+    }
+
+    if (form.assignmentMode === "emails") {
+      return `${parsedEmails.length} email${parsedEmails.length === 1 ? "" : "s"}`;
+    }
+
+    return selectedUser?.name || "No teammate selected yet";
+  }, [form.assignmentMode, parsedEmails.length, selectedTeam?.name, selectedUser?.name, users.length]);
+
+  function updateField(event) {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  async function handleGenerateDraft({ descriptionOnly = false } = {}) {
+    const idea = form.title.trim() || form.description.trim();
+    if (!idea) {
+      toast.error("Add a short task idea first, then I can generate a draft.");
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      const contextBits = [
+        form.assignmentMode === "team" ? `Team assignment for ${selectedTeam?.name || "a team"}` : null,
+        form.assignmentMode === "single" ? `Single assignee: ${selectedUser?.name || "not selected yet"}` : null,
+        form.assignmentMode === "emails" ? `Multiple recipients: ${parsedEmails.length} registered emails` : null,
+        form.assignmentMode === "all" ? "Broadcast assignment to all registered users" : null,
+        form.deadline ? `Deadline hint: ${form.deadline}` : null,
+        form.priority ? `Priority hint: ${form.priority}` : null,
+      ]
+        .filter(Boolean)
+        .join(". ");
+
+      const data = await generateTaskDescription({
+        idea,
+        context: contextBits,
+        audience: form.assignmentMode === "team" ? selectedTeam?.name || "the team" : "registered users",
+        currentTitle: form.title,
+        currentDescription: form.description,
+        deadline: form.deadline,
+        priority: form.priority,
+      });
+
+      const draft = data?.draft || {};
+      setAiDraft(draft);
+      setForm((current) => ({
+        ...current,
+        title: descriptionOnly ? current.title : draft.title || current.title,
+        description: draft.description || current.description,
+        priority: descriptionOnly ? current.priority : draft.priority || current.priority,
+      }));
+
+      toast.success(data.message || "Task draft generated");
+    } catch (error) {
+      toast.error(error.message || "Unable to generate task draft");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+
+    try {
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        priority: form.priority,
+        status: form.status,
+        deadline: form.deadline || undefined,
+        image: form.image,
+      };
+
+      if (form.assignmentMode === "emails") {
+        payload.assignedEmails = parsedEmails;
+      } else if (form.assignmentMode === "team") {
+        payload.assignedTeamId = form.assignedTeamId;
+      } else if (form.assignmentMode === "all") {
+        payload.assignToAllUsers = true;
+      } else {
+        payload.assignedUserId = form.assignedUserId;
+        if (form.reviewDecision === "Approved" || form.reviewDecision === "Rejected") {
+          payload.reviewDecision = form.reviewDecision;
+          payload.reviewFeedback = form.reviewFeedback.trim();
+        }
+      }
+
+      await onSubmit(payload);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: "easeOut" }}
+      className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]"
+    >
+      <form onSubmit={handleSubmit} className="task-panel p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.32em] text-slate-500">
+              {mode === "edit" ? "Edit Task" : "Create Task"}
+            </p>
+            <h2 className="mt-4 font-display text-3xl font-semibold text-slate-950">
+              {mode === "edit" ? "Refine delivery details" : "Spin up a new workstream"}
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+              Keep requirements, owner, deadline, and execution state aligned before the task reaches the team.
+            </p>
+          </div>
+          {onCancel ? (
+            <button type="button" onClick={onCancel} className="btn-secondary">
+              Cancel
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-8 grid gap-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-blue-100 bg-[linear-gradient(145deg,#eff6ff_0%,#ffffff_55%,#f8fafc_100%)] p-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.26em] text-blue-500">AI assistant</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Turn a rough idea into a clean task title, description, requirements, and a priority suggestion.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => handleGenerateDraft()}
+                disabled={generating}
+                className="rounded-2xl bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-400 px-4 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(59,130,246,0.18)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {generating ? "Generating..." : "Generate with AI"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleGenerateDraft({ descriptionOnly: true })}
+                disabled={generating}
+                className="rounded-2xl border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {generating ? "Generating..." : "Generate description"}
+              </button>
+            </div>
+          </div>
+
+          <label className="relative block">
+            <input
+              name="title"
+              value={form.title}
+              onChange={updateField}
+              placeholder="Task title"
+              className="task-field peer"
+              required
+            />
+            <span className="task-floating-label">Task title</span>
+          </label>
+
+          <label className="relative block">
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={updateField}
+              placeholder="Description"
+              className="task-textarea peer"
+              required
+            />
+            <span className="task-floating-label">Description</span>
+          </label>
+
+          <div className="grid gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Assignment mode</span>
+            <select name="assignmentMode" value={form.assignmentMode} onChange={updateField} className="task-select">
+              <option value="single">Single user</option>
+              <option value="team">Whole team</option>
+              <option value="emails">Multiple registered emails</option>
+              <option value="all">All registered users</option>
+            </select>
+          </div>
+
+          {form.assignmentMode === "single" ? (
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Assignee</span>
+                <select
+                  name="assignedUserId"
+                  value={form.assignedUserId}
+                  onChange={updateField}
+                  className="task-select"
+                  required
+                >
+                  <option value="">{loadingUsers ? "Loading users..." : "Choose a teammate"}</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name || user.email}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Deadline</span>
+                <input type="date" name="deadline" value={form.deadline} onChange={updateField} className="task-select" />
+              </label>
+            </div>
+          ) : form.assignmentMode === "team" ? (
+            <>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Team</span>
+                <select
+                  name="assignedTeamId"
+                  value={form.assignedTeamId}
+                  onChange={updateField}
+                  className="task-select"
+                  required
+                >
+                  <option value="">{loadingTeams ? "Loading teams..." : "Choose a team"}</option>
+                  {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Deadline</span>
+                <input type="date" name="deadline" value={form.deadline} onChange={updateField} className="task-select" />
+              </label>
+            </>
+          ) : form.assignmentMode === "emails" ? (
+            <>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
+                  Registered emails
+                </span>
+                <textarea
+                  name="assigneeEmails"
+                  value={form.assigneeEmails}
+                  onChange={updateField}
+                  placeholder="Paste email addresses separated by commas, spaces, or new lines"
+                  className="task-textarea peer min-h-[130px]"
+                  required
+                />
+              </label>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Deadline</span>
+                <input type="date" name="deadline" value={form.deadline} onChange={updateField} className="task-select" />
+              </label>
+            </>
+          ) : (
+            <>
+              <div className="rounded-3xl border border-cyan-200/60 bg-cyan-50/70 p-5 text-sm text-slate-700">
+                This will create one task for every registered student account.
+              </div>
+              <label className="grid gap-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Deadline</span>
+                <input type="date" name="deadline" value={form.deadline} onChange={updateField} className="task-select" />
+              </label>
+            </>
+          )}
+
+          <div className="grid gap-5 md:grid-cols-3">
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Priority</span>
+              <select name="priority" value={form.priority} onChange={updateField} className="task-select">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Status</span>
+              <select name="status" value={form.status} onChange={updateField} className="task-select">
+                {taskStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Preview image</span>
+              <select name="image" value={form.image} onChange={updateField} className="task-select">
+                {taskVisuals.map((value, index) => (
+                  <option key={value} value={value}>
+                    Professional image {index + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {mode === "edit" ? (
+            <div className="grid gap-4 rounded-3xl border border-emerald-200/60 bg-emerald-50/70 p-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.26em] text-emerald-700">Review decision</p>
+                <p className="mt-2 text-sm leading-7 text-slate-700">
+                  Use this section to approve or reject the task after reviewing the submission.
+                </p>
+              </div>
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Decision</span>
+                  <select
+                    name="reviewDecision"
+                    value={form.reviewDecision}
+                    onChange={updateField}
+                    className="task-select"
+                  >
+                    <option value="">Leave unchanged</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </label>
+
+                <label className="grid gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Feedback</span>
+                  <textarea
+                    name="reviewFeedback"
+                    value={form.reviewFeedback}
+                    onChange={updateField}
+                    placeholder="Optional notes for the assignee"
+                    className="task-textarea peer min-h-[130px]"
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 rounded-3xl border border-slate-200/80 bg-[linear-gradient(145deg,rgba(79,70,229,0.05),rgba(6,182,212,0.04),rgba(255,255,255,0.92))] p-5 md:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.26em] text-slate-500">Priority vibe</p>
+              <p className="mt-2 text-sm text-slate-700">
+                {form.priority === "HIGH"
+                  ? "Needs prompt attention and fast execution."
+                  : form.priority === "LOW"
+                    ? "Flexible pacing with light urgency."
+                    : form.status === "COMPLETED"
+                      ? "Ready for archive and stakeholder review."
+                      : form.status === "IN_PROGRESS"
+                        ? "Live execution with active delivery ownership."
+                        : "Queued for kickoff and assignment."}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.26em] text-slate-500">Assignee</p>
+              <p className="mt-2 text-sm text-slate-700">{assignmentSummary}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.26em] text-slate-500">Deadline</p>
+              <p className="mt-2 text-sm text-slate-700">{form.deadline || "Flexible timeline"}</p>
+            </div>
+          </div>
+
+          {aiDraft ? (
+            <div className="rounded-3xl border border-blue-200/70 bg-[linear-gradient(145deg,#eff6ff_0%,#ffffff_55%,#f8fafc_100%)] p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.28em] text-blue-500">AI draft</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-950">
+                    {aiDraft.estimatedTime ? `Estimated time: ${aiDraft.estimatedTime}` : "Generated task draft"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+                    {aiDraft.priority || form.priority}
+                  </span>
+                  {typeof aiDraft.score === "number" ? (
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      Score {aiDraft.score}/100
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              {aiDraft.scoreBreakdown ? (
+                <div className="mt-4 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">Clarity: {aiDraft.scoreBreakdown.clarity}/25</div>
+                  <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">Completeness: {aiDraft.scoreBreakdown.completeness}/25</div>
+                  <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">Specificity: {aiDraft.scoreBreakdown.specificity}/20</div>
+                  <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">Feasibility: {aiDraft.scoreBreakdown.feasibility}/15</div>
+                  <div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-2 sm:col-span-2">Context: {aiDraft.scoreBreakdown.context}/15</div>
+                </div>
+              ) : null}
+              {aiDraft.analysis ? (
+                <p className="mt-4 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">
+                  <span className="block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Analysis</span>
+                  <span className="mt-2 block">{aiDraft.analysis}</span>
+                </p>
+              ) : null}
+              {aiDraft.requirements?.length ? (
+                <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
+                  {aiDraft.requirements.map((item) => (
+                    <li key={item} className="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? savingLabel : idleLabel}
+            </button>
+            <button type="button" onClick={onCancel} className="btn-secondary">
+              Back
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <motion.section
+        initial={{ opacity: 0, x: 16 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.32, delay: 0.06, ease: "easeOut" }}
+        className="task-panel overflow-hidden"
+      >
+        <div className="relative h-[280px] overflow-hidden border-b border-slate-200/80">
+          <img
+            src={form.image}
+            alt={form.title || "Task preview"}
+            className="h-full w-full object-cover transition duration-700 hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.05),rgba(15,23,42,0.70))]" />
+          <div className="absolute left-5 top-5 flex flex-wrap gap-2">
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[form.status]}`}>{form.status}</span>
+            <span className="rounded-full border border-cyan-200 bg-white/20 px-3 py-1 text-xs font-semibold text-white">
+              Live preview
+            </span>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 p-6">
+            <p className="text-xs uppercase tracking-[0.32em] text-white/55">Workstream card</p>
+            <h3 className="mt-3 font-display text-3xl font-semibold text-white">
+              {form.title || "Task title preview"}
+            </h3>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/72">
+              {form.description || "Your task summary will appear here with a premium editorial card layout."}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 p-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Assigned to</p>
+              <p className="mt-2 text-sm font-medium text-slate-950">{assignmentSummary}</p>
+              <p className="mt-1 text-sm text-slate-600">
+              {form.assignmentMode === "emails"
+                  ? `${parsedEmails.length} registered email${parsedEmails.length === 1 ? "" : "s"}`
+                  : form.assignmentMode === "all"
+                    ? "One task record will be created for each registered student."
+                    : selectedUser?.email || "No assignee selected"}
+              </p>
+            </div>
+            {form.assignmentMode === "single" ? (
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Team</p>
+                <p className="mt-2 text-sm font-medium text-slate-950">{selectedUserTeamName}</p>
+                <p className="mt-1 text-sm text-slate-600">The assignee's current team is shown here for quick checking.</p>
+              </div>
+            ) : null}
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+              <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Deadline</p>
+              <p className="mt-2 text-sm font-medium text-slate-950">{form.deadline || "Not scheduled"}</p>
+              <p className="mt-1 text-sm text-slate-600">Keep timelines visible to the delivery team.</p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-indigo-200/70 bg-[linear-gradient(135deg,rgba(99,102,241,0.10),rgba(34,211,238,0.08),rgba(255,255,255,0.88))] p-5">
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Publishing notes</p>
+            <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+              <li>Clear briefs create faster execution and fewer review cycles.</li>
+              <li>Assign ownership before launch so task accountability is visible instantly.</li>
+              <li>Status and deadlines flow directly into the dashboard and task board views.</li>
+            </ul>
+          </div>
+        </div>
+      </motion.section>
+    </motion.div>
+  );
+}

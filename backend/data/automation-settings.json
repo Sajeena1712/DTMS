@@ -1,0 +1,3 @@
+{
+  "aiPromptRules": "Score against the task title, description, requirements, and acceptance criteria.\nPrefer clear relevance to the task brief over generic praise.\nReward complete, structured, and easy-to-review submissions.\nFlag submissions with weak evidence, suspiciously short answers, or missing core requirements.\nExplain the score in short plain language so admins can act quickly."
+}

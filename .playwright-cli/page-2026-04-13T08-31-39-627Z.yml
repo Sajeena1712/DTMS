@@ -1,0 +1,238 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e86]:
+      - complementary [ref=e87]:
+        - generic [ref=e88]:
+          - generic [ref=e90]:
+            - img "DTMS Admin" [ref=e92]
+            - generic [ref=e93]:
+              - paragraph [ref=e94]: Logged in
+              - paragraph [ref=e95]: DTMS Admin
+              - paragraph [ref=e96]: admin@dtms.com
+          - navigation [ref=e97]:
+            - link "D Dashboard" [ref=e98] [cursor=pointer]:
+              - /url: "#/admin-dashboard"
+              - generic [ref=e100]:
+                - generic [ref=e101]: D
+                - generic [ref=e102]: Dashboard
+            - link "LB Leaderboard" [ref=e103] [cursor=pointer]:
+              - /url: "#/leaderboard"
+              - generic [ref=e105]:
+                - generic [ref=e106]: LB
+                - generic [ref=e107]: Leaderboard
+            - link "T Tasks" [ref=e108] [cursor=pointer]:
+              - /url: "#/tasks"
+              - generic [ref=e110]:
+                - generic [ref=e111]: T
+                - generic [ref=e112]: Tasks
+            - link "C Calendar" [ref=e113] [cursor=pointer]:
+              - /url: "#/calendar"
+              - generic [ref=e115]:
+                - generic [ref=e116]: C
+                - generic [ref=e117]: Calendar
+            - link "A Analytics" [ref=e118] [cursor=pointer]:
+              - /url: "#/analytics"
+              - generic [ref=e120]:
+                - generic [ref=e121]: A
+                - generic [ref=e122]: Analytics
+            - link "TM Team" [ref=e123] [cursor=pointer]:
+              - /url: "#/team"
+              - generic [ref=e125]:
+                - generic [ref=e126]: TM
+                - generic [ref=e127]: Team
+            - link "S Settings" [ref=e128] [cursor=pointer]:
+              - /url: "#/settings"
+              - generic [ref=e130]:
+                - generic [ref=e131]: S
+                - generic [ref=e132]: Settings
+        - generic [ref=e133]:
+          - paragraph [ref=e134]: Workspace
+          - paragraph [ref=e135]: DTMS Admin
+          - paragraph [ref=e136]: admin@dtms.com
+          - button "Logout" [ref=e137] [cursor=pointer]
+      - generic [ref=e138]:
+        - banner [ref=e139]:
+          - generic [ref=e140]:
+            - paragraph [ref=e141]: DTMS
+            - heading "Lead with clarity. Deliver with purpose." [level=1] [ref=e142]
+            - paragraph [ref=e143]: Every great workflow starts with a calm mind and a bold next step.
+        - main [ref=e144]:
+          - generic [ref=e145]:
+            - generic [ref=e147]:
+              - generic [ref=e148]:
+                - paragraph [ref=e149]: Admin dashboard
+                - heading "Welcome back, DTMS Admin" [level=1] [ref=e150]
+                - paragraph [ref=e151]: Oversee task assignment, team coordination, and full analytics from a cleaner DTMS SaaS workspace.
+              - generic [ref=e152]:
+                - paragraph [ref=e153]: Admin control
+                - paragraph [ref=e154]: Full analytics and user management active
+            - generic [ref=e155]:
+              - article [ref=e156]:
+                - paragraph [ref=e157]: Total Tasks
+                - paragraph [ref=e158]: "792"
+                - paragraph [ref=e159]: All assignments across DTMS.
+              - article [ref=e160]:
+                - paragraph [ref=e161]: Completed
+                - paragraph [ref=e162]: "14"
+                - paragraph [ref=e163]: Delivered and approved tasks.
+              - article [ref=e164]:
+                - paragraph [ref=e165]: Ongoing
+                - paragraph [ref=e166]: "0"
+                - paragraph [ref=e167]: Work currently in progress.
+              - article [ref=e168]:
+                - paragraph [ref=e169]: Pending
+                - paragraph [ref=e170]: "778"
+                - paragraph [ref=e171]: Waiting for action or review.
+            - generic [ref=e172]:
+              - article [ref=e173]:
+                - paragraph [ref=e174]: AI Approved
+                - paragraph [ref=e175]: "3"
+                - paragraph [ref=e176]: Submissions that met the automatic approval threshold.
+              - article [ref=e177]:
+                - paragraph [ref=e178]: AI Pending
+                - paragraph [ref=e179]: "788"
+                - paragraph [ref=e180]: AI-scored submissions waiting for admin confirmation.
+              - article [ref=e181]:
+                - paragraph [ref=e182]: AI Rejected
+                - paragraph [ref=e183]: "1"
+                - paragraph [ref=e184]: Submissions that were auto-rejected or flagged for closer review.
+            - generic [ref=e185]:
+              - generic [ref=e186]:
+                - generic [ref=e187]:
+                  - paragraph [ref=e188]: Notifications
+                  - heading "Discussion alerts" [level=2] [ref=e189]
+                  - paragraph [ref=e190]: Unreads from task threads are shown here so the admin can jump into the latest feedback and replies.
+                - generic [ref=e191]:
+                  - paragraph [ref=e192]: Threads
+                  - paragraph [ref=e193]: "5"
+              - generic [ref=e194]:
+                - 'button "java Unread DTMS Admin: hi Updated 5d ago 2 comments" [ref=e195] [cursor=pointer]':
+                  - generic [ref=e198]:
+                    - generic [ref=e199]:
+                      - paragraph [ref=e200]: java
+                      - generic [ref=e201]: Unread
+                    - paragraph [ref=e202]:
+                      - generic [ref=e203]: "DTMS Admin:"
+                      - text: hi
+                    - generic [ref=e204]:
+                      - generic [ref=e205]: Updated 5d ago
+                      - generic [ref=e206]: 2 comments
+                - 'button "java Unread SAJEENA SURESH GEETHA: hi i have blocker error Updated 5d ago 1 comment" [ref=e207] [cursor=pointer]':
+                  - generic [ref=e210]:
+                    - generic [ref=e211]:
+                      - paragraph [ref=e212]: java
+                      - generic [ref=e213]: Unread
+                    - paragraph [ref=e214]:
+                      - generic [ref=e215]: "SAJEENA SURESH GEETHA:"
+                      - text: hi i have blocker error
+                    - generic [ref=e216]:
+                      - generic [ref=e217]: Updated 5d ago
+                      - generic [ref=e218]: 1 comment
+                - 'button "dghsgh Unread DTMS Admin: hi Updated 6d ago 1 comment" [ref=e219] [cursor=pointer]':
+                  - generic [ref=e222]:
+                    - generic [ref=e223]:
+                      - paragraph [ref=e224]: dghsgh
+                      - generic [ref=e225]: Unread
+                    - paragraph [ref=e226]:
+                      - generic [ref=e227]: "DTMS Admin:"
+                      - text: hi
+                    - generic [ref=e228]:
+                      - generic [ref=e229]: Updated 6d ago
+                      - generic [ref=e230]: 1 comment
+                - 'button "fghjk Unread DTMS Admin: hi Updated 6d ago 1 comment" [ref=e231] [cursor=pointer]':
+                  - generic [ref=e234]:
+                    - generic [ref=e235]:
+                      - paragraph [ref=e236]: fghjk
+                      - generic [ref=e237]: Unread
+                    - paragraph [ref=e238]:
+                      - generic [ref=e239]: "DTMS Admin:"
+                      - text: hi
+                    - generic [ref=e240]:
+                      - generic [ref=e241]: Updated 6d ago
+                      - generic [ref=e242]: 1 comment
+            - generic [ref=e243]:
+              - article [ref=e244]:
+                - paragraph [ref=e245]: Task analytics
+                - heading "Task activity over time" [level=2] [ref=e246]
+                - application [ref=e250]:
+                  - generic [ref=e251]:
+                    - generic [ref=e252]:
+                      - generic [ref=e254]: Apr 9
+                      - generic [ref=e256]: Apr 8
+                      - generic [ref=e258]: Apr 7
+                      - generic [ref=e260]: Apr 6
+                      - generic [ref=e262]: Apr 1
+                      - generic [ref=e264]: Mar 25
+                      - generic [ref=e266]: Mar 21
+                    - generic [ref=e267]:
+                      - generic [ref=e269]: "0"
+                      - generic [ref=e271]: "150"
+                      - generic [ref=e273]: "300"
+                      - generic [ref=e275]: "450"
+                      - generic [ref=e277]: "600"
+              - article [ref=e278]:
+                - paragraph [ref=e279]: Distribution
+                - heading "Task split" [level=2] [ref=e280]
+                - application [ref=e284]
+            - generic [ref=e285]:
+              - article [ref=e286]:
+                - generic [ref=e287]:
+                  - generic [ref=e288]:
+                    - paragraph [ref=e289]: Completion
+                    - heading "Overall progress" [level=2] [ref=e290]
+                    - application [ref=e294]
+                    - paragraph [ref=e298]: 2%
+                  - generic [ref=e299]:
+                    - paragraph [ref=e300]: Reminders
+                    - heading "Upcoming deadlines" [level=2] [ref=e301]
+                    - generic [ref=e302]:
+                      - generic [ref=e303]:
+                        - paragraph [ref=e304]: Develop Heart Attack Detection and Classification Model
+                        - paragraph [ref=e305]: Due in 3 days
+                      - generic [ref=e306]:
+                        - paragraph [ref=e307]: Develop Heart Attack Detection and Classification Model
+                        - paragraph [ref=e308]: Due in 3 days
+                      - generic [ref=e309]:
+                        - paragraph [ref=e310]: Develop Heart Attack Detection and Classification Model
+                        - paragraph [ref=e311]: Due in 3 days
+                      - generic [ref=e312]:
+                        - paragraph [ref=e313]: Develop Heart Attack Detection and Classification Model
+                        - paragraph [ref=e314]: Due in 3 days
+              - article [ref=e315]:
+                - generic [ref=e316]:
+                  - paragraph [ref=e317]: Team collaboration
+                  - heading "Team load" [level=2] [ref=e318]
+                  - generic [ref=e319]:
+                    - generic [ref=e320]:
+                      - generic [ref=e321]:
+                        - generic [ref=e322]: US
+                        - generic [ref=e323]: User97
+                      - generic [ref=e324]: 7 tasks
+                    - generic [ref=e325]:
+                      - generic [ref=e326]:
+                        - generic [ref=e327]: US
+                        - generic [ref=e328]: User100
+                      - generic [ref=e329]: 8 tasks
+                    - generic [ref=e330]:
+                      - generic [ref=e331]:
+                        - generic [ref=e332]: US
+                        - generic [ref=e333]: User98
+                      - generic [ref=e334]: 6 tasks
+                    - generic [ref=e335]:
+                      - generic [ref=e336]:
+                        - generic [ref=e337]: US
+                        - generic [ref=e338]: User99
+                      - generic [ref=e339]: 7 tasks
+                    - generic [ref=e340]:
+                      - generic [ref=e341]:
+                        - generic [ref=e342]: US
+                        - generic [ref=e343]: User92
+                      - generic [ref=e344]: 7 tasks
+                - generic [ref=e345]:
+                  - paragraph [ref=e346]: Time tracker
+                  - heading "Workload tracking" [level=2] [ref=e347]
+                  - generic [ref=e348]:
+                    - paragraph [ref=e349]: Focus hours this week
+                    - paragraph [ref=e350]: 2376h
+    - status [ref=e358]: Signed in successfully
+  - generic [ref=e359]: "0"

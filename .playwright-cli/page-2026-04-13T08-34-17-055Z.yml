@@ -1,0 +1,6 @@
+- generic [ref=e8]:
+  - img "DTMS logo" [ref=e14]
+  - generic [ref=e15]:
+    - heading "Initializing DTMS..." [level=1] [ref=e17]
+    - paragraph [ref=e18]: Restoring your session, validating access, and loading your workspace.
+    - paragraph [ref=e20]: Welcome back 👋 Keep going, your next step matters.

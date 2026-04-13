@@ -1,0 +1,7 @@
+- generic [ref=e3]:
+  - generic [ref=e10]:
+    - img "DTMS logo" [ref=e16]
+    - generic [ref=e17]:
+      - heading "Initializing System..." [level=1] [ref=e19]
+      - paragraph [ref=e21]: Welcome back 👋 Keep going, your next step matters.
+  - button "Skip" [ref=e27] [cursor=pointer]

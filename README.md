@@ -1,6 +1,6 @@
 # Digital Talent Management System
 
-DTMS is a role-based task workflow app built with React on the frontend and Node.js/Express on the backend.
+DTMS is a role-based task workflow app built with React in `frontnd` and Node.js/Express in `backend`.
 
 ## What It Does
 

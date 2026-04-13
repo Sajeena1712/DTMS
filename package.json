@@ -5,16 +5,16 @@
   "type": "module",
   "homepage": "https://sajeena1712.github.io/DTMS",
   "scripts": {
-    "dev": "concurrently \"npm run server:start\" \"npm run client:dev\" --names \"server,frontend\" --prefix-colors \"blue,green\"",
-    "client:dev": "node --require ./scripts/esbuild-spawn-shim.cjs ./node_modules/vite/bin/vite.js",
-    "build": "vite build",
+    "dev": "scripts\\dev.cmd",
+    "client:dev": "node --require ./scripts/esbuild-spawn-shim.cjs ./node_modules/vite/bin/vite.js --configLoader native",
+    "build": "vite build --configLoader native",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "node scripts/deploy-pages.mjs",
-    "start": "concurrently \"npm run server:start\" \"npm run client:dev\" --names \"server,frontend\" --prefix-colors \"blue,green\"",
-    "server:dev": "npm --prefix server run dev",
-    "server:start": "npm --prefix server run start",
-    "server:seed": "npm --prefix server run seed"
+    "start": "scripts\\dev.cmd",
+    "server:dev": "npm --prefix backend run dev",
+    "server:start": "npm --prefix backend run start",
+    "server:seed": "npm --prefix backend run seed"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

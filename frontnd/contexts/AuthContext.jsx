@@ -74,17 +74,6 @@ export function AuthProvider({ children }) {
     });
   };
 
-  const verifyEmail = async (token) => {
-    return runWithLoader("Verifying secure access...", async () => {
-      const data = await safeRequest(
-        () => api.get(`/auth/verify-email/${token}`),
-        "Email verification failed",
-      );
-      toast.success(data.message || "Email verified");
-      return data;
-    });
-  };
-
   const forgotPassword = async (payload) => {
     return runWithLoader("Starting password recovery...", async () => {
       const data = await safeRequest(
@@ -142,7 +131,6 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       login,
       register,
-      verifyEmail,
       forgotPassword,
       resetPassword,
       updateProfile,

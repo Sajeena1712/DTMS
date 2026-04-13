@@ -42,18 +42,6 @@ export async function getCurrentUser() {
 }
 
 /**
- * Resend verification email for an unverified account
- * @param {string} email - User email
- * @returns {Promise} - { message }
- */
-export async function resendVerificationEmail(email) {
-  return safeRequest(
-    () => api.post("/auth/resend-verification", { email }),
-    "Failed to resend verification email"
-  );
-}
-
-/**
  * Request password reset email
  * @param {string} email - User email
  * @returns {Promise} - { message }
@@ -75,18 +63,6 @@ export async function resetPassword(token, passwords) {
   return safeRequest(
     () => api.post(`/auth/reset-password/${token}`, passwords),
     "Password reset failed. Try again or request a new link."
-  );
-}
-
-/**
- * Verify email with token
- * @param {string} token - Verification token from email
- * @returns {Promise} - { message }
- */
-export async function verifyEmail(token) {
-  return safeRequest(
-    () => api.get(`/auth/verify-email/${token}`),
-    "Email verification failed. The link may have expired."
   );
 }
 

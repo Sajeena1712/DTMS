@@ -122,47 +122,6 @@ function buildEmailLayout({ eyebrow, title, intro, actionLabel, actionUrl, foote
   `;
 }
 
-async function sendVerificationEmail(req, user, verificationToken) {
-  const verifyLink = buildClientRoute(req, `/verify-email/${verificationToken}`);
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log("Verification link (dev):", verifyLink);
-  }
-
-  await sendEmail({
-    to: user.email,
-    subject: "Confirm your DTMS account",
-    text: [
-      `Hello ${user.name || "there"},`,
-      "",
-      "Please confirm your email address to activate your DTMS account.",
-      "",
-      `Confirm your email: ${verifyLink}`,
-      "",
-      "This link expires in 24 hours.",
-      "If you did not create this account, ignore this message.",
-    ].join("\n"),
-    html: buildPremiumEmail({
-      eyebrow: "DTMS Access",
-      title: "Confirm your email",
-      intro: `Hello ${user.name || "there"},<br /><br />Confirm your email address to activate your DTMS account and begin using your workspace.`,
-      actionLabel: "Confirm Now",
-      actionUrl: verifyLink,
-      footerNote: "This verification link expires in 24 hours. If you did not create this account, you can ignore this message.",
-      ...buildEmailBrandAssets(),
-      accent: "#2563eb",
-      accentSoft: "#dbeafe",
-      badgeTone: "#2563eb",
-      details: [
-        { label: "Account", value: user.email },
-        { label: "Security", value: "Verification required" },
-      ],
-    }),
-  });
-
-  return verifyLink;
-}
-
 export async function register(req, res, next) {
   try {
     const { name, email, password, confirmPassword } = req.body;
@@ -194,25 +153,22 @@ export async function register(req, res, next) {
         return res.status(409).json({ message: "Email is already registered" });
       }
 
-      const verificationToken = crypto.randomBytes(32).toString("hex");
       await prisma.user.update({
         where: { id: existingUser.id },
         data: {
-          emailVerificationTokenHash: sha256(verificationToken),
-          emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          emailVerified: true,
+          emailVerificationTokenHash: null,
+          emailVerificationExpiresAt: null,
         },
       });
 
-      await sendVerificationEmail(req, existingUser, verificationToken);
       return res.status(200).json({
-        message: "Your verification email has been resent. Please check your inbox and spam folder.",
-        user: buildPublicUser(existingUser),
+        message: "Account is ready to use. You can sign in now.",
+        user: buildPublicUser({ ...existingUser, emailVerified: true }),
       });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    const verificationTokenHash = sha256(verificationToken);
 
     const user = await prisma.user.create({
       data: {
@@ -225,17 +181,15 @@ export async function register(req, res, next) {
         experience: "",
         education: "",
         certifications: [],
-        emailVerified: false,
-        emailVerificationTokenHash: verificationTokenHash,
-        emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        emailVerified: true,
+        emailVerificationTokenHash: null,
+        emailVerificationExpiresAt: null,
       },
     });
 
-    await sendVerificationEmail(req, user, verificationToken);
-
 
     res.status(201).json({
-      message: "Registration successful. Please check your email to verify your account.",
+      message: "Registration successful. You can sign in now.",
       user: buildPublicUser(user),
     });
   } catch (error) {
@@ -263,10 +217,6 @@ export async function login(req, res, next) {
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    if (!user.emailVerified) {
-      return res.status(403).json({ message: "Please verify your email before signing in" });
     }
 
     const token = generateToken(user.id);
@@ -316,33 +266,7 @@ export async function logout(req, res) {
 
 export async function verifyEmail(req, res, next) {
   try {
-    const { token } = req.params;
-    if (!token) {
-      return res.status(400).json({ message: "Verification token is required" });
-    }
-
-    const tokenHash = sha256(token);
-    const user = await prisma.user.findFirst({
-      where: {
-        emailVerificationTokenHash: tokenHash,
-        emailVerificationExpiresAt: { gt: new Date() },
-      },
-    });
-
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired verification token" });
-    }
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerified: true,
-        emailVerificationTokenHash: null,
-        emailVerificationExpiresAt: null,
-      },
-    });
-
-    return res.status(200).json({ message: "Email verified successfully. You can sign in now." });
+    return res.status(200).json({ message: "Email verification is no longer required. You can sign in now." });
   } catch (error) {
     next(error);
   }
@@ -350,37 +274,8 @@ export async function verifyEmail(req, res, next) {
 
 export async function resendVerificationEmail(req, res, next) {
   try {
-    const { email } = req.body;
-
-    if (!validateEmail(email)) {
-      return res.status(400).json({ message: "Please enter a valid email address" });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
-
-    if (!user) {
-      return res.status(200).json({ message: "If the account exists, a verification email has been sent." });
-    }
-
-    if (user.emailVerified) {
-      return res.status(200).json({ message: "Your email is already verified. You can sign in now." });
-    }
-
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerificationTokenHash: sha256(verificationToken),
-        emailVerificationExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
-
-    await sendVerificationEmail(req, user, verificationToken);
-
     return res.status(200).json({
-      message: "A new verification email has been sent. Please check your inbox and spam folder.",
+      message: "Email verification is no longer required. You can sign in now.",
     });
   } catch (error) {
     next(error);

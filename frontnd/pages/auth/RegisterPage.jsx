@@ -216,7 +216,7 @@ export default function RegisterPage() {
             <p className="mt-8 text-center text-xs uppercase tracking-[0.34em] text-slate-500">DTMS Access</p>
             <h2 className="mt-4 text-center text-4xl font-semibold text-slate-900">Create Account</h2>
             <p className="mx-auto mt-3 max-w-md text-center text-sm leading-7 text-slate-600">
-              Create your account with a strong password. We will send a verification link to activate DTMS access.
+              Create your account with a strong password. Your account will be ready to use right away.
             </p>
 
             <form className="mt-10 space-y-7" onSubmit={handleSubmit(onSubmit)}>

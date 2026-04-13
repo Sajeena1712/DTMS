@@ -13,7 +13,6 @@ const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/auth/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/auth/ResetPasswordPage"));
-const VerifyEmailPage = lazy(() => import("./pages/auth/VerifyEmailPage"));
 const AdminDashboardPage = lazy(() => import("./pages/dashboard/AdminDashboardPage"));
 const AnalyticsPage = lazy(() => import("./pages/dashboard/AnalyticsPage"));
 const CalendarPage = lazy(() => import("./pages/dashboard/CalendarPage"));
@@ -149,7 +148,7 @@ function AppRoutes() {
               <Route path="/register" element={<PublicOnlyRoute><RegisterPage /></PublicOnlyRoute>} />
               <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPasswordPage /></PublicOnlyRoute>} />
               <Route path="/reset-password/:token" element={<PublicOnlyRoute><ResetPasswordPage /></PublicOnlyRoute>} />
-              <Route path="/verify-email/:token" element={<PublicOnlyRoute><VerifyEmailPage /></PublicOnlyRoute>} />
+              <Route path="/verify-email/:token" element={<Navigate to="/login" replace />} />
               <Route element={<ProtectedRoute><AuthedLayout /></ProtectedRoute>}>
                 <Route path="/admin-dashboard" element={<RoleRoute allowedRole="admin"><AdminDashboardPage /></RoleRoute>} />
                 <Route path="/analytics" element={<AnalyticsPage />} />

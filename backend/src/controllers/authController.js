@@ -165,6 +165,7 @@ async function sendVerificationEmail(req, user, verificationToken) {
 
 export async function register(req, res, next) {
   try {
+    const { name, email, password, confirmPassword } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({ message: "Name is required" });

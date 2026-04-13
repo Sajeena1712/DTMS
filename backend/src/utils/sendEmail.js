@@ -5,6 +5,10 @@ export async function sendEmail({ to, subject, html, text }) {
   const senderFrom = process.env.MAIL_FROM || process.env.EMAIL_FROM || senderUser || "DTMS <noreply@dtms.local>";
 
   if (!senderUser) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Email sender is not configured. Set MAIL_USER or EMAIL_USER in production.");
+    }
+
     console.log("Email preview");
     console.log({ to, subject, text });
     return;

@@ -230,6 +230,8 @@ export async function register(req, res, next) {
       },
     });
 
+    await sendVerificationEmail(req, user, verificationToken);
+
 
     res.status(201).json({
       message: "Registration successful. Please check your email to verify your account.",

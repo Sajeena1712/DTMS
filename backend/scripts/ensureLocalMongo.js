@@ -183,6 +183,10 @@ async function ensureReplicaSet(hostname, port) {
 }
 
 async function ensureLocalMongo() {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
   const databaseUrl = process.env.DATABASE_URL;
 
   if (!isLocalMongoUrl(databaseUrl)) {

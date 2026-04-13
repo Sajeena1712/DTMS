@@ -24,10 +24,10 @@ export async function sendEmail({ to, subject, html, text }) {
   }
 
   try {
-    const replyTo = senderFrom && senderFrom !== senderUser ? senderFrom : undefined;
+    const replyTo = senderFrom && senderFrom !== senderUser ? senderUser : undefined;
     const info = await withTimeout(
       transporter.sendMail({
-        from: senderUser,
+        from: senderFrom,
         replyTo,
         to,
         subject,
@@ -37,7 +37,7 @@ export async function sendEmail({ to, subject, html, text }) {
       Number(process.env.EMAIL_TIMEOUT_MS || 15000),
       "Email sending timed out"
     );
-    console.log("Email sent", { to, messageId: info.messageId, from: senderUser, replyTo: replyTo || null });
+    console.log("Email sent", { to, messageId: info.messageId, from: senderFrom, replyTo: replyTo || null });
   } catch (error) {
     console.error("Email delivery failed", error);
     throw error;

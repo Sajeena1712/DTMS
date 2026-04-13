@@ -163,14 +163,6 @@ async function sendVerificationEmail(req, user, verificationToken) {
   return verifyLink;
 }
 
-function queueVerificationEmail(req, user, verificationToken) {
-  return Promise.resolve()
-    .then(() => sendVerificationEmail(req, user, verificationToken))
-    .catch((error) => {
-      console.error("Verification email queue failed", error);
-    });
-}
-
 export async function register(req, res, next) {
   try {
     const { name, email, password, confirmPassword } = req.body;
@@ -211,7 +203,7 @@ export async function register(req, res, next) {
         },
       });
 
-      queueVerificationEmail(req, existingUser, verificationToken);
+      await sendVerificationEmail(req, existingUser, verificationToken);
       return res.status(200).json({
         message: "Your verification email has been resent. Please check your inbox and spam folder.",
         user: buildPublicUser(existingUser),
@@ -239,7 +231,7 @@ export async function register(req, res, next) {
       },
     });
 
-    queueVerificationEmail(req, user, verificationToken);
+    await sendVerificationEmail(req, user, verificationToken);
 
 
     res.status(201).json({
@@ -385,7 +377,7 @@ export async function resendVerificationEmail(req, res, next) {
       },
     });
 
-    queueVerificationEmail(req, user, verificationToken);
+    await sendVerificationEmail(req, user, verificationToken);
 
     return res.status(200).json({
       message: "A new verification email has been sent. Please check your inbox and spam folder.",
